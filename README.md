@@ -10,8 +10,8 @@ Day 28 of Savion's 100 Day AI Build Challenge.
 
 - **Snap-and-move-on capture.** A full-screen camera with one big shutter. Capture → confirm (Keep / Retake) → straight back to the camera. The upload and AI cataloging happen entirely in the background.
 - **Hands-free auto-capture.** Flip on Auto and just hold each item up — a motion-settle detector snaps it the moment you hold it still, saves automatically, and offers a 3-second Undo. No ML model, works for any item including clothing.
-- **AI cataloging with your own key.** Each captured photo is sent to Claude (server-side), which returns a description, brand, primary color + hex swatch, and category. Cards fill themselves in live.
-- **Bring-your-own Anthropic key, encrypted.** You paste your key once on the Settings page. It's encrypted server-side with AES-256-GCM and never sent back to the browser — the UI only shows a masked preview.
+- **AI cataloging, zero setup.** Each captured photo is sent to Claude (server-side), which returns a description, brand, primary color + hex swatch, and category. Cards fill themselves in live. Works out of the box on a shared key — **30 catalogs/day free** per user.
+- **Bring-your-own key for unlimited.** Optionally paste your own Anthropic key on the Settings page for unlimited cataloging (billed to your account). It's encrypted server-side with AES-256-GCM, never sent back to the browser, and bypasses the daily cap. The UI only shows a masked preview.
 - **Multiple catalogs.** Organize captures into separate buckets (e.g. "Carry-on", "Garage", "For sale"), switch the active one before you snap, and rename or delete buckets. Deleting a bucket never loses items — they fall into an "Unassigned" bucket.
 - **Move & bulk actions.** Move any item to another bucket, or multi-select to move or delete many at once.
 - **Live inventory with filters.** A realtime grid you can search and filter by category and status. Brand and description are editable inline; delete an item from its card menu.
@@ -60,6 +60,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...   # Settings → API → Publishable ke
 APP_ENCRYPTION_KEY=...                      # 32 random bytes, base64:  openssl rand -base64 32
 CATALOG_WEBHOOK_SECRET=...                  # any random string:        openssl rand -hex 24
 ADMIN_EMAIL=you@example.com                 # for the /admin telemetry dashboard
+ANTHROPIC_API_KEY=...                        # shared key for the free tier (30/day/user)
 SUPABASE_SERVICE_ROLE_KEY=                  # OPTIONAL — only the prod webhook uses it
 ```
 

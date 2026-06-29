@@ -39,7 +39,6 @@ export function Camera({
   const [autoMode, setAutoMode] = useState(false);
   const [count, setCount] = useState(0);
   const [lastThumb, setLastThumb] = useState<string | null>(null);
-  const [keyed, setKeyed] = useState(hasKey);
   const [showOnboard, setShowOnboard] = useState(false);
   const [saved, setSaved] = useState<Saved | null>(null);
   const undoTimer = useRef<number | null>(null);
@@ -221,15 +220,8 @@ export function Camera({
         </button>
       </div>
 
-      {/* Status hint / no-key prompt */}
-      {!keyed ? (
-        <Link
-          href="/settings"
-          className="absolute inset-x-4 top-[4.75rem] rounded-xl bg-amber-400/95 px-4 py-3 text-sm font-medium text-amber-950 shadow-lg backdrop-blur"
-        >
-          Add your Anthropic API key to start cataloging →
-        </Link>
-      ) : autoMode && !captured ? (
+      {/* Auto-capture hint */}
+      {autoMode && !captured && (
         <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] flex justify-center">
           <span className="rounded-full bg-black/45 px-3.5 py-1.5 text-sm font-medium text-white backdrop-blur">
             {phase === "engaging"
@@ -237,7 +229,7 @@ export function Camera({
               : "Hold an item up — it snaps automatically"}
           </span>
         </div>
-      ) : null}
+      )}
 
       {/* Undo toast */}
       {saved && (
@@ -317,8 +309,7 @@ export function Camera({
       </div>
       {showOnboard && (
         <Onboarding
-          onComplete={(savedKey) => {
-            if (savedKey) setKeyed(true);
+          onComplete={() => {
             if (typeof window !== "undefined") {
               window.localStorage.setItem("packrite.onboarded", "1");
             }

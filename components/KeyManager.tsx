@@ -60,7 +60,9 @@ export function KeyManager() {
         <div>
           <h2 className="text-base font-semibold">Anthropic API key</h2>
           <p className="mt-1 text-sm leading-6 text-muted">
-            Used to catalog your photos with Claude. Encrypted on our server and
+            Optional. Cataloging works out of the box — 30 photos/day free. Add
+            your own key for <span className="font-medium">unlimited</span>{" "}
+            cataloging, billed to your Anthropic account. Encrypted on our server,
             never shown again.
           </p>
         </div>
@@ -164,12 +166,10 @@ function KeyBadge({
   return (
     <span
       className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-        hasKey
-          ? "bg-emerald-50 text-emerald-700"
-          : "bg-amber-50 text-amber-700"
+        hasKey ? "bg-emerald-50 text-emerald-700" : "bg-accent-soft text-accent"
       }`}
     >
-      {hasKey ? "Connected" : "Not set"}
+      {hasKey ? "Unlimited" : "Free tier"}
     </span>
   );
 }

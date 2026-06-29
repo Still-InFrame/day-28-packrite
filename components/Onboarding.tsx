@@ -40,16 +40,34 @@ export function Onboarding({
         <Wordmark className="mb-8" />
 
         <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome — one quick setup
+          Welcome to packrite
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted">
-          packrite uses <span className="font-medium">your own</span> Anthropic
-          API key to identify and describe each item you snap. Paste it once and
-          you&apos;re set — it&apos;s encrypted on our server and never shown
-          again.
+          Snap an item and it catalogs itself with AI —{" "}
+          <span className="font-medium text-foreground">30 a day, free</span>. No
+          setup needed.
         </p>
 
-        <ol className="mt-6 space-y-3">
+        <Button
+          size="lg"
+          onClick={() => onComplete(false)}
+          className="mt-6 w-full"
+        >
+          Start snapping →
+        </Button>
+
+        <div className="my-6 flex items-center gap-3 text-xs text-zinc-400">
+          <span className="h-px flex-1 bg-border" />
+          WANT UNLIMITED?
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <p className="text-sm leading-6 text-muted">
+          Add your own Anthropic key for unlimited cataloging — billed to your
+          account, a fraction of a cent per photo. Encrypted, never shown again.
+        </p>
+
+        <ol className="mt-4 space-y-3">
           <Step n={1}>
             Go to{" "}
             <a
@@ -62,11 +80,11 @@ export function Onboarding({
             </a>{" "}
             and create a key.
           </Step>
-          <Step n={2}>Paste it below and tap Continue.</Step>
-          <Step n={3}>Start snapping — items catalog themselves.</Step>
+          <Step n={2}>Add a little credit under Billing.</Step>
+          <Step n={3}>Paste it below.</Step>
         </ol>
 
-        <div className="mt-7 flex flex-col gap-3">
+        <div className="mt-5 flex flex-col gap-3">
           <Input
             type="password"
             autoComplete="off"
@@ -77,26 +95,15 @@ export function Onboarding({
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button
-            size="lg"
+            variant="secondary"
             onClick={save}
             loading={saving}
             disabled={!value.trim()}
             className="w-full"
           >
-            Continue
+            Save key for unlimited
           </Button>
-          <button
-            onClick={() => onComplete(false)}
-            className="text-center text-sm font-medium text-muted hover:text-foreground"
-          >
-            Skip for now — I&apos;ll add it later
-          </button>
         </div>
-
-        <p className="mt-5 text-center text-xs text-zinc-400">
-          You can capture without a key; items just wait to be cataloged until
-          you add one in Settings.
-        </p>
       </div>
     </div>
   );

@@ -6,6 +6,10 @@ import type { CatalogVision } from "@/lib/types";
 // Current Claude Sonnet vision model.
 const VISION_MODEL = "claude-sonnet-4-6";
 
+// Free catalogs/day on the app's shared key (ANTHROPIC_API_KEY). Users who add
+// their own key are unlimited and never counted against this.
+const SHARED_DAILY_LIMIT = 30;
+
 const PROMPT = `You are cataloging a single physical item from a photo for a packing inventory.
 Return ONLY raw JSON — no markdown, no backticks, no preamble — in exactly this shape:
 {
@@ -16,7 +20,9 @@ Return ONLY raw JSON — no markdown, no backticks, no preamble — in exactly t
   "category": "broad category like shirt, pants, shoes, accessory, etc."
 }`;
 
-type Result = { status: "done" | "error" | "skipped" | "no_key" };
+type Result = {
+  status: "done" | "error" | "skipped" | "no_key" | "limited";
+};
 
 // Idempotent worker shared by the webhook, the client kick, and the reconciler.
 // The caller passes the Supabase client to use: a user-session client (client
@@ -40,15 +46,36 @@ export async function processItem(
   if (!item) return { status: "skipped" }; // already claimed / done / missing
 
   try {
-    // The user's encrypted key. If absent, return the item to pending so it
-    // gets cataloged automatically once they add a key (reconciler picks it up).
+    // Pick the key: the user's own (unlimited) or the app's shared key (capped).
     const { data: keyRow } = await supabase
       .from("packrite_user_api_keys")
       .select("ciphertext, iv, auth_tag")
       .eq("user_id", item.user_id)
       .maybeSingle();
 
-    if (!keyRow) {
+    let apiKey: string;
+    if (keyRow) {
+      apiKey = decrypt({
+        ciphertext: keyRow.ciphertext,
+        iv: keyRow.iv,
+        authTag: keyRow.auth_tag,
+      });
+    } else if (process.env.ANTHROPIC_API_KEY) {
+      // Free tier: charge one unit of today's shared-key quota.
+      const { data: allowed } = await supabase.rpc("packrite_use_shared_quota", {
+        p_user: item.user_id,
+        p_limit: SHARED_DAILY_LIMIT,
+      });
+      if (allowed === false) {
+        await supabase
+          .from("packrite_catalog_items")
+          .update({ status: "limited" })
+          .eq("id", item.id);
+        return { status: "limited" };
+      }
+      apiKey = process.env.ANTHROPIC_API_KEY;
+    } else {
+      // No personal key and no shared key configured — wait for one.
       await supabase
         .from("packrite_catalog_items")
         .update({ status: "pending" })
@@ -64,12 +91,6 @@ export async function processItem(
     if (dlErr || !file) throw dlErr ?? new Error("image download failed");
 
     const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
-
-    const apiKey = decrypt({
-      ciphertext: keyRow.ciphertext,
-      iv: keyRow.iv,
-      authTag: keyRow.auth_tag,
-    });
 
     const anthropic = new Anthropic({ apiKey });
     const message = await anthropic.messages.create({

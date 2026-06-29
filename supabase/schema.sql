@@ -42,7 +42,7 @@ create table if not exists public.packrite_catalog_items (
   cataloged_at  timestamptz, -- set when status -> done (telemetry: catalog time)
   image_path    text,
   status        text not null default 'pending'
-                check (status in ('pending', 'processing', 'done', 'error')),
+                check (status in ('pending', 'processing', 'done', 'error', 'limited')),
   description   text,
   brand         text,
   primary_color text,
@@ -266,3 +266,34 @@ create policy "packrite_item_photos_shared_read" on storage.objects
       where i.image_path = name and c.is_shared = true
     )
   );
+
+-- ===========================================================================
+-- Free-tier daily cap on the app's shared Anthropic key (ANTHROPIC_API_KEY).
+-- BYO-key users are unlimited and never touch this.
+-- ===========================================================================
+create table if not exists public.packrite_shared_usage (
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  usage_date date not null,
+  count      int not null default 0,
+  primary key (user_id, usage_date)
+);
+alter table public.packrite_shared_usage enable row level security;
+create policy "packrite_shared_usage_select_own" on public.packrite_shared_usage
+  for select using (auth.uid() = user_id);
+
+-- Atomically claim one unit of today's (ET) quota; returns true if within limit.
+create or replace function public.packrite_use_shared_quota(p_user uuid, p_limit int)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare
+  today date := (now() at time zone 'America/New_York')::date;
+  cur int;
+begin
+  if auth.uid() is not null and p_user <> auth.uid() then raise exception 'forbidden'; end if;
+  insert into public.packrite_shared_usage (user_id, usage_date, count)
+    values (p_user, today, 1)
+    on conflict (user_id, usage_date) do update set count = packrite_shared_usage.count + 1
+    returning count into cur;
+  return cur <= p_limit;
+end;
+$$;
+grant execute on function public.packrite_use_shared_quota(uuid, int) to authenticated, service_role;

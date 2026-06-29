@@ -146,6 +146,21 @@ export function ItemCard({
               Retry
             </button>
           </div>
+        ) : item.status === "limited" ? (
+          <div className="flex flex-col gap-1.5 py-0.5">
+            <span className="text-sm font-medium text-amber-700">
+              Daily free limit reached
+            </span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted">Add a key for unlimited</span>
+              <button
+                onClick={retry}
+                className="rounded-lg bg-zinc-100 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-zinc-200"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             <EditableField

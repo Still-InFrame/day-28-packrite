@@ -1,6 +1,11 @@
 // Shared domain types, kept in sync with the packrite_* tables.
 
-export type ItemStatus = "pending" | "processing" | "done" | "error";
+export type ItemStatus =
+  | "pending"
+  | "processing"
+  | "done"
+  | "error"
+  | "limited";
 
 export interface CatalogItem {
   id: string;
