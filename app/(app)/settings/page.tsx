@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 import { KeyManager } from "@/components/KeyManager";
@@ -98,6 +99,16 @@ export default async function SettingsPage({
           <SignOutButton />
         </div>
       </div>
+
+      <p className="mt-8 text-center text-xs text-zinc-400">
+        <Link href="/terms" className="hover:text-foreground hover:underline">
+          Terms
+        </Link>
+        {" · "}
+        <Link href="/privacy" className="hover:text-foreground hover:underline">
+          Privacy
+        </Link>
+      </p>
     </div>
   );
 }

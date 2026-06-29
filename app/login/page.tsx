@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Wordmark } from "@/components/Brand";
 import { AuthForm } from "@/components/AuthForm";
 
@@ -26,8 +27,16 @@ export default function LoginPage() {
           <AuthForm />
         </div>
 
-        <p className="mt-6 text-center text-xs text-zinc-400">
-          Day 28 of the 100 Day AI Build Challenge
+        <p className="mt-6 text-center text-xs leading-5 text-zinc-400">
+          By continuing you agree to our{" "}
+          <Link href="/terms" className="underline hover:text-foreground">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="underline hover:text-foreground">
+            Privacy Policy
+          </Link>
+          .
         </p>
       </div>
     </div>
