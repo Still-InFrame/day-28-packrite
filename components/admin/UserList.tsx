@@ -10,6 +10,30 @@ function fmtDate(iso: string | null): string {
   return d.toLocaleDateString("en", { month: "short", day: "numeric", year: "2-digit" });
 }
 
+const REGION =
+  typeof Intl !== "undefined" && "DisplayNames" in Intl
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
+
+// "US" -> "🇺🇸 United States". Returns null when no country is known.
+function countryLabel(code: string | null): string | null {
+  if (!code) return null;
+  const cc = code.toUpperCase();
+  let name = cc;
+  try {
+    name = REGION?.of(cc) ?? cc;
+  } catch {
+    name = cc;
+  }
+  const flag =
+    cc.length === 2
+      ? String.fromCodePoint(
+          ...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
+        )
+      : "";
+  return `${flag} ${name}`.trim();
+}
+
 export function UserList({
   users: initial,
   adminId,
@@ -71,6 +95,7 @@ export function UserList({
                 <p className="truncate text-sm font-medium">{u.email}</p>
                 <p className="mt-0.5 text-xs text-muted">
                   Joined {fmtDate(u.createdAt)} · Active {fmtDate(u.lastSignInAt)}
+                  {countryLabel(u.country) && <> · {countryLabel(u.country)}</>}
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">

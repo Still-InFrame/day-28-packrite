@@ -5,14 +5,18 @@ import { ArcElement, Chart, Legend, Tooltip } from "chart.js";
 
 Chart.register(ArcElement, Tooltip, Legend);
 
+// High-contrast categorical palette — adjacent slices stay visually distinct
+// (the old indigo/violet pair read as one color).
 const COLORS = [
-  "#4f46e5",
-  "#7c3aed",
-  "#0891b2",
-  "#db2777",
-  "#ea580c",
-  "#16a34a",
-  "#a1a1aa",
+  "#4f46e5", // indigo (brand)
+  "#f59e0b", // amber
+  "#10b981", // emerald
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#ef4444", // red
+  "#8b5cf6", // violet
+  "#84cc16", // lime
+  "#a1a1aa", // zinc (other)
 ];
 
 export function CountryPie({
