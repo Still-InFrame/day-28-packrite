@@ -26,36 +26,55 @@ export function CountryPie({
   labels: string[];
   data: number[];
 }) {
+  const total = data.reduce((a, b) => a + b, 0);
+
   return (
-    <div style={{ height: 240 }}>
-      <Doughnut
-        data={{
-          labels,
-          datasets: [{ data, backgroundColor: COLORS, borderWidth: 0 }],
-        }}
-        options={{
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: "62%",
-          plugins: {
-            legend: {
-              position: "bottom",
-              labels: {
-                boxWidth: 10,
-                boxHeight: 10,
-                padding: 12,
-                font: { size: 11 },
-                color: "#52525b",
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+      <div className="h-[200px] w-[200px] shrink-0">
+        <Doughnut
+          data={{
+            labels,
+            datasets: [{ data, backgroundColor: COLORS, borderWidth: 0 }],
+          }}
+          options={{
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "62%",
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed}` },
               },
             },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => ` ${ctx.label}: ${ctx.parsed}`,
-              },
-            },
-          },
-        }}
-      />
+          }}
+        />
+      </div>
+
+      {/* Key: country + count (+ share) */}
+      <ul className="w-full flex-1 space-y-1.5">
+        {labels.map((label, i) => {
+          const count = data[i] ?? 0;
+          const pct = total ? Math.round((count / total) * 100) : 0;
+          return (
+            <li
+              key={label}
+              className="flex items-center justify-between gap-2 text-sm"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                />
+                <span className="truncate text-foreground">{label}</span>
+              </span>
+              <span className="shrink-0 tabular-nums text-muted">
+                <span className="font-medium text-foreground">{count}</span>
+                <span className="ml-1 text-xs text-zinc-400">{pct}%</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
