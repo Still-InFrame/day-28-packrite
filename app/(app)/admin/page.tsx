@@ -33,13 +33,29 @@ export default async function AdminPage() {
     data = null;
   }
 
+  // Read-only indicator: which Stripe mode this deployment is built against
+  // (mode is a build/deploy-time env decision, not a runtime toggle).
+  const stripeTest = process.env.STRIPE_MODE === "test";
+
   return (
     <div className="flex-1 px-4 pb-28 pt-8">
       <header className="mb-6 flex items-center justify-between">
         <Wordmark />
-        <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent">
-          Admin
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              stripeTest
+                ? "bg-amber-100 text-amber-700"
+                : "bg-emerald-50 text-emerald-700"
+            }`}
+            title="Stripe mode is set at deploy time via STRIPE_MODE"
+          >
+            Stripe {stripeTest ? "TEST" : "LIVE"}
+          </span>
+          <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent">
+            Admin
+          </span>
+        </div>
       </header>
 
       <h1 className="text-2xl font-semibold tracking-tight">Telemetry</h1>

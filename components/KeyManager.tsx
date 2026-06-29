@@ -15,6 +15,7 @@ export function KeyManager() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   async function load() {
     const res = await fetch("/api/keys");
@@ -55,19 +56,23 @@ export function KeyManager() {
   const loading = status === null;
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Anthropic API key</h2>
-          <p className="mt-1 text-sm leading-6 text-muted">
-            Optional. Cataloging works out of the box — 30 photos/day free. Add
-            your own key for <span className="font-medium">unlimited</span>{" "}
-            cataloging, billed to your Anthropic account. Encrypted on our server,
-            never shown again.
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs text-zinc-300 transition-colors hover:text-zinc-500"
+      >
+        {!loading && status?.hasKey ? "Manage your API key" : "Use your own API key"}
+      </button>
+
+      {open && (
+        <div className="mt-3 rounded-2xl border border-border bg-surface p-5 shadow-sm">
+          <p className="text-sm leading-6 text-muted">
+            Optional. Cataloging works out of the box — 30 free. Prefer to run on
+            your own Anthropic account?  Add a key for{" "}
+            <span className="font-medium">unlimited</span> cataloging, billed to
+            you. Encrypted on our server, never shown again.
           </p>
-        </div>
-        <KeyBadge loading={loading} hasKey={status?.hasKey ?? false} />
-      </div>
 
       {!loading && status.hasKey && !editing && (
         <div className="mt-4 flex items-center justify-between rounded-xl bg-zinc-50 px-3.5 py-3">
@@ -149,27 +154,8 @@ export function KeyManager() {
           </div>
         </div>
       )}
+        </div>
+      )}
     </div>
-  );
-}
-
-function KeyBadge({
-  loading,
-  hasKey,
-}: {
-  loading: boolean;
-  hasKey: boolean;
-}) {
-  if (loading) {
-    return <span className="h-6 w-16 shrink-0 rounded-full shimmer" />;
-  }
-  return (
-    <span
-      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-        hasKey ? "bg-emerald-50 text-emerald-700" : "bg-accent-soft text-accent"
-      }`}
-    >
-      {hasKey ? "Unlimited" : "Free tier"}
-    </span>
   );
 }

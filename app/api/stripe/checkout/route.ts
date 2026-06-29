@@ -46,7 +46,13 @@ export async function POST(request: Request) {
     customerId = c.id;
   }
 
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? new URL(request.url).origin;
+  // Return to wherever the user actually is: the browser sends Origin on this
+  // POST, so localhost stays on localhost (test mode) and prod stays on prod.
+  // NEXT_PUBLIC_BASE_URL is only a fallback for non-browser callers.
+  const base =
+    request.headers.get("origin") ??
+    process.env.NEXT_PUBLIC_BASE_URL ??
+    new URL(request.url).origin;
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     ui_mode: "embedded_page",

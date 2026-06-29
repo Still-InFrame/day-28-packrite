@@ -21,10 +21,16 @@ export function Camera({
   catalogs,
   userId,
   hasKey,
+  unlimited = false,
+  stripeManaged = false,
+  planLabel = null,
 }: {
   catalogs: Catalog[];
   userId: string;
   hasKey: boolean;
+  unlimited?: boolean;
+  stripeManaged?: boolean;
+  planLabel?: string | null;
 }) {
   const webcamRef = useRef<Webcam>(null);
   const [activeId, setActiveId] = useActiveCatalog(catalogs);
@@ -43,7 +49,9 @@ export function Camera({
   const [saved, setSaved] = useState<Saved | null>(null);
   const undoTimer = useRef<number | null>(null);
 
-  // First run with no key -> walk the user through adding one (skip remembered).
+  // First run -> welcome screen (remembered after dismiss). BYO-key users are
+  // fully set up so they skip it; subscribers still see it but get their current
+  // plan + a "Manage in Settings" shortcut instead of the upsell.
   useEffect(() => {
     if (
       !hasKey &&
@@ -309,6 +317,9 @@ export function Camera({
       </div>
       {showOnboard && (
         <Onboarding
+          unlimited={unlimited}
+          stripeManaged={stripeManaged}
+          planLabel={planLabel}
           onComplete={() => {
             if (typeof window !== "undefined") {
               window.localStorage.setItem("packrite.onboarded", "1");

@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, subPeriodEndISO, subPlanInfo } from "@/lib/stripe";
 import { KeyManager } from "@/components/KeyManager";
 import { PlanCard } from "@/components/PlanCard";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -31,9 +31,10 @@ export default async function SettingsPage({
         session.status === "complete" &&
         session.metadata?.user_id === user.id
       ) {
-        const subObj = session.subscription as
-          | (Stripe.Subscription & { current_period_end?: number })
-          | null;
+        const subObj = session.subscription as Stripe.Subscription | null;
+        const info = subObj
+          ? subPlanInfo(subObj)
+          : { interval: null, amount: null, currency: null };
         await supabase.rpc("packrite_apply_subscription", {
           p_secret: process.env.STRIPE_DB_SECRET ?? "",
           p_user: user.id,
@@ -44,9 +45,11 @@ export default async function SettingsPage({
               ? session.customer
               : (session.customer?.id ?? null),
           p_subscription: subObj?.id ?? null,
-          p_period_end: subObj?.current_period_end
-            ? new Date(subObj.current_period_end * 1000).toISOString()
-            : null,
+          p_period_end: subObj ? subPeriodEndISO(subObj) : null,
+          p_cancel_at_period_end: subObj?.cancel_at_period_end ?? false,
+          p_interval: info.interval,
+          p_amount: info.amount,
+          p_currency: info.currency,
         });
         upgraded = true;
       }
@@ -57,7 +60,9 @@ export default async function SettingsPage({
 
   const { data: sub } = await supabase
     .from("packrite_subscriptions")
-    .select("plan, source, free_used")
+    .select(
+      "plan, source, free_used, current_period_end, cancel_at_period_end, stripe_subscription_id, plan_interval, plan_amount, plan_currency",
+    )
     .maybeSingle();
   const { data: keyRow } = await supabase
     .from("packrite_user_api_keys")
@@ -88,6 +93,14 @@ export default async function SettingsPage({
           hasKey={Boolean(keyRow)}
           freeUsed={sub?.free_used ?? 0}
           limit={30}
+          stripeManaged={
+            sub?.source === "stripe" && Boolean(sub?.stripe_subscription_id)
+          }
+          cancelAtPeriodEnd={sub?.cancel_at_period_end ?? false}
+          currentPeriodEnd={sub?.current_period_end ?? null}
+          interval={sub?.plan_interval ?? null}
+          amount={sub?.plan_amount ?? null}
+          currency={sub?.plan_currency ?? null}
         />
         <KeyManager />
 

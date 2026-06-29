@@ -330,6 +330,10 @@ create table if not exists public.packrite_subscriptions (
   stripe_customer_id     text,
   stripe_subscription_id text,
   current_period_end     timestamptz,
+  cancel_at_period_end   boolean not null default false,
+  plan_interval          text,
+  plan_amount            int,
+  plan_currency          text,
   free_used              int not null default 0,
   updated_at             timestamptz not null default now()
 );
@@ -343,6 +347,13 @@ begin
   if auth.uid() is not null and p_user <> auth.uid() then raise exception 'forbidden'; end if;
   insert into public.packrite_subscriptions (user_id) values (p_user)
     on conflict (user_id) do nothing;
+  -- Lazy downgrade: a canceled Stripe sub past its paid period reverts to free
+  -- (covers the gap before/without a live cancellation webhook).
+  update public.packrite_subscriptions
+    set plan = 'free', source = 'none', status = 'canceled',
+        cancel_at_period_end = false, updated_at = now()
+    where user_id = p_user and source = 'stripe' and cancel_at_period_end
+      and current_period_end is not null and current_period_end < now();
   if exists (select 1 from public.packrite_subscriptions s
              where s.user_id = p_user and s.plan = 'unlimited') then
     return true;
@@ -353,6 +364,55 @@ begin
 end;
 $$;
 grant execute on function public.packrite_use_free_quota(uuid, int) to authenticated, service_role;
+
+-- Secret-gated writer used by the Stripe webhook + checkout return-flow (no
+-- service-role key). p_cancel_at_period_end flags a pending cancellation.
+create or replace function public.packrite_apply_subscription(
+  p_secret text, p_user uuid, p_active boolean, p_status text,
+  p_customer text, p_subscription text, p_period_end timestamptz,
+  p_cancel_at_period_end boolean default false,
+  p_interval text default null, p_amount int default null, p_currency text default null
+) returns void language plpgsql security definer set search_path = public as $$
+begin
+  if p_secret is distinct from
+     (select value from public.packrite_app_secrets where name = 'sub_writer') then
+    raise exception 'forbidden';
+  end if;
+  insert into public.packrite_subscriptions
+    (user_id, plan, source, status, stripe_customer_id, stripe_subscription_id,
+     current_period_end, cancel_at_period_end, plan_interval, plan_amount, plan_currency, updated_at)
+  values
+    (p_user,
+     case when p_active then 'unlimited' else 'free' end,
+     case when p_active then 'stripe' else 'none' end,
+     p_status, p_customer, p_subscription, p_period_end,
+     case when p_active then p_cancel_at_period_end else false end,
+     case when p_active then p_interval else null end,
+     case when p_active then p_amount   else null end,
+     case when p_active then p_currency else null end,
+     now())
+  on conflict (user_id) do update set
+    plan = case when p_active then 'unlimited'
+                when public.packrite_subscriptions.source = 'admin' then 'unlimited'
+                else 'free' end,
+    source = case when p_active then 'stripe'
+                  when public.packrite_subscriptions.source = 'admin' then 'admin'
+                  else 'none' end,
+    status = excluded.status,
+    stripe_customer_id = coalesce(excluded.stripe_customer_id,
+                                  public.packrite_subscriptions.stripe_customer_id),
+    stripe_subscription_id = excluded.stripe_subscription_id,
+    current_period_end = excluded.current_period_end,
+    cancel_at_period_end = case when p_active then p_cancel_at_period_end else false end,
+    plan_interval = case when p_active then p_interval else null end,
+    plan_amount   = case when p_active then p_amount   else null end,
+    plan_currency = case when p_active then p_currency else null end,
+    updated_at = now();
+end;
+$$;
+grant execute on function public.packrite_apply_subscription(
+  text, uuid, boolean, text, text, text, timestamptz, boolean, text, int, text
+) to anon, authenticated, service_role;
 
 create or replace function public.packrite_admin_set_plan(p_target uuid, p_unlimited boolean)
 returns void language plpgsql security definer set search_path = public as $$

@@ -7,8 +7,13 @@ import {
 } from "@stripe/react-stripe-js";
 
 // Loaded once. Null when the publishable key is missing from the bundle, so we
-// can show a clear message instead of a blank sheet.
-const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+// can show a clear message instead of a blank sheet. Both NEXT_PUBLIC_* keys are
+// referenced literally so Next inlines them at build time; the mode flag picks one.
+const TEST_MODE = process.env.NEXT_PUBLIC_STRIPE_MODE === "test";
+const PUBLISHABLE_KEY =
+  (TEST_MODE
+    ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST
+    : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) ?? "";
 const stripePromise = PUBLISHABLE_KEY ? loadStripe(PUBLISHABLE_KEY) : null;
 
 export function CheckoutSheet({
