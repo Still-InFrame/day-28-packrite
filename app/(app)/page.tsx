@@ -9,5 +9,12 @@ export default async function CapturePage() {
   } = await supabase.auth.getUser();
   const catalogs = await getOrCreateCatalogs(supabase, user!.id);
 
-  return <Camera catalogs={catalogs} userId={user!.id} />;
+  const { data: keyRow } = await supabase
+    .from("packrite_user_api_keys")
+    .select("user_id")
+    .maybeSingle();
+
+  return (
+    <Camera catalogs={catalogs} userId={user!.id} hasKey={Boolean(keyRow)} />
+  );
 }

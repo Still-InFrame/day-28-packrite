@@ -9,12 +9,25 @@ import type { CatalogItem } from "@/lib/types";
 export function ItemCard({
   item,
   onChange,
+  onRemove,
 }: {
   item: CatalogItem;
   onChange: (next: CatalogItem) => void;
+  onRemove: (id: string) => void;
 }) {
   const url = useSignedUrl(item.image_path);
   const processing = item.status === "pending" || item.status === "processing";
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  async function remove() {
+    setMenuOpen(false);
+    onRemove(item.id); // optimistic
+    const supabase = createClient();
+    await supabase.from("packrite_catalog_items").delete().eq("id", item.id);
+    if (item.image_path) {
+      await supabase.storage.from("item-photos").remove([item.image_path]);
+    }
+  }
 
   async function save(field: "brand" | "description", value: string) {
     const next = { ...item, [field]: value || null };
@@ -56,6 +69,35 @@ export function ItemCard({
           <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium capitalize text-white backdrop-blur">
             {item.category}
           </span>
+        )}
+
+        {/* Overflow menu */}
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-label="Item actions"
+          className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" className="size-4" aria-hidden>
+            <circle cx="12" cy="5" r="1.6" />
+            <circle cx="12" cy="12" r="1.6" />
+            <circle cx="12" cy="19" r="1.6" />
+          </svg>
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-1.5 top-10 z-20 w-32 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-xl">
+              <button
+                onClick={remove}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden>
+                  <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Delete
+              </button>
+            </div>
+          </>
         )}
       </div>
 

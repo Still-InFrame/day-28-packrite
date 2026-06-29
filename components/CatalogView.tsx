@@ -72,6 +72,10 @@ export function CatalogView({
     setItems((prev) => prev.map((i) => (i.id === next.id ? next : i)));
   }
 
+  function removeItem(id: string) {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  }
+
   const inCatalog = useMemo(
     () => items.filter((i) => i.catalog_id === activeId),
     [items, activeId],
@@ -164,7 +168,12 @@ export function CatalogView({
       ) : (
         <div className="grid grid-cols-2 gap-3">
           {filtered.map((item) => (
-            <ItemCard key={item.id} item={item} onChange={upsert} />
+            <ItemCard
+              key={item.id}
+              item={item}
+              onChange={upsert}
+              onRemove={removeItem}
+            />
           ))}
         </div>
       )}

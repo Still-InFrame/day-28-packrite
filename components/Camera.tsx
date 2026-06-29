@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useActiveCatalog } from "@/lib/useActiveCatalog";
 import { useMotionCapture } from "@/lib/useMotionCapture";
 import { CatalogSwitcher } from "@/components/CatalogSwitcher";
+import { Onboarding } from "@/components/Onboarding";
 import { cn } from "@/lib/cn";
 import type { Catalog } from "@/lib/types";
 
@@ -19,9 +20,11 @@ type Saved = { id: string; path: string };
 export function Camera({
   catalogs,
   userId,
+  hasKey,
 }: {
   catalogs: Catalog[];
   userId: string;
+  hasKey: boolean;
 }) {
   const webcamRef = useRef<Webcam>(null);
   const [activeId, setActiveId] = useActiveCatalog(catalogs);
@@ -36,16 +39,21 @@ export function Camera({
   const [autoMode, setAutoMode] = useState(false);
   const [count, setCount] = useState(0);
   const [lastThumb, setLastThumb] = useState<string | null>(null);
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [keyed, setKeyed] = useState(hasKey);
+  const [showOnboard, setShowOnboard] = useState(false);
   const [saved, setSaved] = useState<Saved | null>(null);
   const undoTimer = useRef<number | null>(null);
 
+  // First run with no key -> walk the user through adding one (skip remembered).
   useEffect(() => {
-    fetch("/api/keys")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setHasKey(d?.hasKey ?? false))
-      .catch(() => setHasKey(false));
-  }, []);
+    if (
+      !hasKey &&
+      typeof window !== "undefined" &&
+      !window.localStorage.getItem("packrite.onboarded")
+    ) {
+      setShowOnboard(true);
+    }
+  }, [hasKey]);
 
   // Upload + insert + kick the background catalog job. Returns the new row id +
   // storage path so auto-capture can offer an undo.
@@ -214,7 +222,7 @@ export function Camera({
       </div>
 
       {/* Status hint / no-key prompt */}
-      {hasKey === false ? (
+      {!keyed ? (
         <Link
           href="/settings"
           className="absolute inset-x-4 top-[4.75rem] rounded-xl bg-amber-400/95 px-4 py-3 text-sm font-medium text-amber-950 shadow-lg backdrop-blur"
@@ -307,6 +315,17 @@ export function Camera({
           </div>
         )}
       </div>
+      {showOnboard && (
+        <Onboarding
+          onComplete={(savedKey) => {
+            if (savedKey) setKeyed(true);
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem("packrite.onboarded", "1");
+            }
+            setShowOnboard(false);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -26,6 +26,8 @@ export function CatalogSwitcher({
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const active = catalogs.find((c) => c.id === activeId) ?? catalogs[0];
   const dark = variant === "dark";
@@ -45,6 +47,22 @@ export function CatalogSwitcher({
     setName("");
     setCreating(false);
     setOpen(false);
+    router.refresh();
+  }
+
+  async function rename(id: string) {
+    const v = renameValue.trim();
+    if (!v) {
+      setRenamingId(null);
+      return;
+    }
+    setBusy(true);
+    await createClient()
+      .from("packrite_catalogs")
+      .update({ name: v })
+      .eq("id", id);
+    setBusy(false);
+    setRenamingId(null);
     router.refresh();
   }
 
@@ -69,22 +87,60 @@ export function CatalogSwitcher({
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-xl border border-border bg-surface p-1.5 shadow-xl">
             <div className="max-h-64 overflow-y-auto">
-              {catalogs.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    onSelect(c.id);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100",
-                    c.id === activeId && "font-medium text-accent",
-                  )}
-                >
-                  <span className="truncate">{c.name}</span>
-                  {c.id === activeId && <CheckIcon className="size-4 shrink-0" />}
-                </button>
-              ))}
+              {catalogs.map((c) =>
+                renamingId === c.id ? (
+                  <div key={c.id} className="flex items-center gap-1 p-1">
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") rename(c.id);
+                        if (e.key === "Escape") setRenamingId(null);
+                      }}
+                      className="h-8 min-w-0 flex-1 rounded-lg border border-accent px-2.5 text-sm outline-none"
+                    />
+                    <button
+                      onClick={() => rename(c.id)}
+                      disabled={busy}
+                      className="h-8 shrink-0 rounded-lg bg-accent px-2.5 text-xs font-medium text-white disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    key={c.id}
+                    className="group flex items-center rounded-lg hover:bg-zinc-100"
+                  >
+                    <button
+                      onClick={() => {
+                        onSelect(c.id);
+                        setOpen(false);
+                      }}
+                      className={cn(
+                        "flex min-w-0 flex-1 items-center justify-between px-3 py-2 text-left text-sm",
+                        c.id === activeId && "font-medium text-accent",
+                      )}
+                    >
+                      <span className="truncate">{c.name}</span>
+                      {c.id === activeId && (
+                        <CheckIcon className="size-4 shrink-0" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRenamingId(c.id);
+                        setRenameValue(c.name);
+                      }}
+                      aria-label={`Rename ${c.name}`}
+                      className="mr-1 shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-foreground"
+                    >
+                      <PencilIcon className="size-4" />
+                    </button>
+                  </div>
+                ),
+              )}
             </div>
 
             <div className="my-1 h-px bg-border" />
@@ -159,6 +215,14 @@ function PlusIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
       <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M13.5 6.5l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
