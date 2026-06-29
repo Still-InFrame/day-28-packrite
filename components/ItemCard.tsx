@@ -163,6 +163,17 @@ export function ItemCard({
           </div>
         ) : (
           <div className="flex flex-col gap-2">
+            {item.moderation === "pii" && (
+              <button
+                onClick={remove}
+                className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-left text-xs font-medium text-amber-800 hover:bg-amber-100"
+              >
+                <svg viewBox="0 0 24 24" fill="none" className="size-4 shrink-0" aria-hidden>
+                  <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Contains personal info — tap to delete
+              </button>
+            )}
             <EditableField
               value={item.description}
               placeholder="Add a description"

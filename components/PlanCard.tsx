@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { CheckoutSheet } from "@/components/CheckoutSheet";
 import { cn } from "@/lib/cn";
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 export function PlanCard({ plan, source, hasKey, freeUsed, limit }: Props) {
   const [loading, setLoading] = useState<"monthly" | "yearly" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
   // BYO key and unlimited plans don't need an upgrade.
   const unlimited = hasKey || plan === "unlimited";
@@ -28,12 +30,12 @@ export function PlanCard({ plan, source, hasKey, freeUsed, limit }: Props) {
       body: JSON.stringify({ interval }),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || !json.url) {
+    setLoading(null);
+    if (!res.ok || !json.clientSecret) {
       setError(json.error ?? "Couldn't start checkout.");
-      setLoading(null);
       return;
     }
-    window.location.href = json.url;
+    setClientSecret(json.clientSecret);
   }
 
   const used = Math.min(freeUsed, limit);
@@ -115,6 +117,13 @@ export function PlanCard({ plan, source, hasKey, freeUsed, limit }: Props) {
             </p>
           </div>
         </>
+      )}
+
+      {clientSecret && (
+        <CheckoutSheet
+          clientSecret={clientSecret}
+          onClose={() => setClientSecret(null)}
+        />
       )}
     </div>
   );

@@ -91,6 +91,11 @@ export function UserList({
                     Free
                   </span>
                 )}
+                {u.strikes > 0 && (
+                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    {u.strikes} strike{u.strikes > 1 ? "s" : ""}
+                  </span>
+                )}
                 {u.banned && (
                   <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
                     Blocked

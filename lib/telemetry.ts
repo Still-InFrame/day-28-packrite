@@ -16,6 +16,7 @@ export interface AdminUserRow {
   plan: "free" | "unlimited";
   source: "none" | "stripe" | "admin";
   country: string | null;
+  strikes: number;
 }
 
 export interface Telemetry {
@@ -57,6 +58,7 @@ interface OverviewRow {
     plan: "free" | "unlimited";
     source: "none" | "stripe" | "admin";
     free_used: number;
+    strikes: number;
   }>;
   items: Array<{
     status: string;
@@ -193,6 +195,7 @@ export async function getTelemetry(): Promise<Telemetry> {
         plan: u.plan,
         source: u.source,
         country: u.country,
+        strikes: u.strikes,
       }))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
   };

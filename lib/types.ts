@@ -19,6 +19,7 @@ export interface CatalogItem {
   primary_color: string | null;
   color_hex: string | null;
   category: string | null;
+  moderation: string | null; // e.g. "pii" — flagged content warning
 }
 
 export interface Catalog {

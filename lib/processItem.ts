@@ -11,8 +11,17 @@ const VISION_MODEL = "claude-sonnet-4-6";
 const FREE_LIMIT = 30;
 
 const PROMPT = `You are cataloging a single physical item from a photo for a packing inventory.
-Return ONLY raw JSON — no markdown, no backticks, no preamble — in exactly this shape:
+
+First, moderate the image. Set "moderation" to exactly one of:
+- "sexual": nudity, sexual/explicit content, or bestiality
+- "violence": graphic violence, gore, or self-harm
+- "extremist": terrorist or violent-extremist content
+- "pii": clearly readable sensitive personal info (credit/debit card numbers, SSNs, passports, driver's licenses, ID cards)
+- "ok": anything else. NOTE: firearms, knives, and other weapons are "ok" — people inventory them.
+
+Then describe the item. Return ONLY raw JSON — no markdown, no backticks, no preamble — in exactly this shape:
 {
+  "moderation": "ok" | "sexual" | "violence" | "extremist" | "pii",
   "description": "one concise sentence describing the item",
   "brand": "brand name or null if not visible",
   "primary_color": "plain color name",
@@ -20,8 +29,10 @@ Return ONLY raw JSON — no markdown, no backticks, no preamble — in exactly t
   "category": "broad category like shirt, pants, shoes, accessory, etc."
 }`;
 
+const PROHIBITED = new Set(["sexual", "violence", "extremist"]);
+
 type Result = {
-  status: "done" | "error" | "skipped" | "no_key" | "limited";
+  status: "done" | "error" | "skipped" | "no_key" | "limited" | "rejected";
 };
 
 // Idempotent worker shared by the webhook, the client kick, and the reconciler.
@@ -123,6 +134,21 @@ export async function processItem(
 
     const vision = parseVision(text);
 
+    // Prohibited content: delete the item + photo and record a strike
+    // (the RPC auto-blocks the account at 3 strikes).
+    if (PROHIBITED.has(vision.moderation)) {
+      if (item.image_path) {
+        await supabase.storage.from("item-photos").remove([item.image_path]);
+      }
+      await supabase.from("packrite_catalog_items").delete().eq("id", item.id);
+      await supabase.rpc("packrite_record_strike", {
+        p_secret: process.env.STRIPE_DB_SECRET ?? "",
+        p_user: item.user_id,
+        p_category: vision.moderation,
+      });
+      return { status: "rejected" };
+    }
+
     await supabase
       .from("packrite_catalog_items")
       .update({
@@ -132,6 +158,8 @@ export async function processItem(
         primary_color: vision.primary_color,
         color_hex: vision.color_hex,
         category: vision.category,
+        // PII -> keep the item but flag it so the UI warns the user to delete it.
+        moderation: vision.moderation === "pii" ? "pii" : null,
         cataloged_at: new Date().toISOString(),
       })
       .eq("id", item.id);
@@ -148,7 +176,7 @@ export async function processItem(
 }
 
 // Tolerant parse: strip stray markdown fences, then JSON.parse inside try/catch.
-function parseVision(raw: string): CatalogVision {
+function parseVision(raw: string): CatalogVision & { moderation: string } {
   let text = raw.trim();
   if (text.startsWith("```")) {
     text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -157,8 +185,14 @@ function parseVision(raw: string): CatalogVision {
   const end = text.lastIndexOf("}");
   if (start !== -1 && end !== -1) text = text.slice(start, end + 1);
 
-  const parsed = JSON.parse(text) as Partial<CatalogVision>;
+  const parsed = JSON.parse(text) as Partial<CatalogVision> & {
+    moderation?: string;
+  };
+  const mod = String(parsed.moderation ?? "ok").toLowerCase();
   return {
+    moderation: ["sexual", "violence", "extremist", "pii"].includes(mod)
+      ? mod
+      : "ok",
     description: String(parsed.description ?? "Unidentified item"),
     brand: parsed.brand ? String(parsed.brand) : null,
     primary_color: String(parsed.primary_color ?? "unknown"),
