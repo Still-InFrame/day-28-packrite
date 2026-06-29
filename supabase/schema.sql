@@ -205,6 +205,10 @@ begin
           from public.packrite_catalog_items group by user_id
         ) ic on ic.user_id = au.id
         left join public.packrite_user_api_keys k on k.user_id = au.id
+        -- shared sandbox: only count users who've actually used packrite
+        where exists (select 1 from public.packrite_catalogs c where c.user_id = au.id)
+           or ic.cnt is not null
+           or k.user_id is not null
       ) u
     ),
     'items', (
