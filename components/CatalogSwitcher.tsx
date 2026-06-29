@@ -28,6 +28,7 @@ export function CatalogSwitcher({
   const [busy, setBusy] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const active = catalogs.find((c) => c.id === activeId) ?? catalogs[0];
   const dark = variant === "dark";
@@ -66,6 +67,33 @@ export function CatalogSwitcher({
     router.refresh();
   }
 
+  async function remove(id: string) {
+    setBusy(true);
+    const supabase = createClient();
+    // Collect storage paths first — the row cascade won't touch the bucket.
+    const { data: items } = await supabase
+      .from("packrite_catalog_items")
+      .select("image_path")
+      .eq("catalog_id", id);
+    const paths = (items ?? [])
+      .map((i) => i.image_path as string | null)
+      .filter((p): p is string => Boolean(p));
+
+    // Deleting the catalog cascades its item rows (FK on delete cascade).
+    await supabase.from("packrite_catalogs").delete().eq("id", id);
+    if (paths.length) {
+      await supabase.storage.from("item-photos").remove(paths);
+    }
+
+    setBusy(false);
+    setConfirmingId(null);
+    if (id === activeId) {
+      const next = catalogs.find((c) => c.id !== id);
+      if (next) onSelect(next.id);
+    }
+    router.refresh();
+  }
+
   return (
     <div className="relative">
       <button
@@ -87,28 +115,53 @@ export function CatalogSwitcher({
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-xl border border-border bg-surface p-1.5 shadow-xl">
             <div className="max-h-64 overflow-y-auto">
-              {catalogs.map((c) =>
-                renamingId === c.id ? (
-                  <div key={c.id} className="flex items-center gap-1 p-1">
-                    <input
-                      autoFocus
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") rename(c.id);
-                        if (e.key === "Escape") setRenamingId(null);
-                      }}
-                      className="h-8 min-w-0 flex-1 rounded-lg border border-accent px-2.5 text-sm outline-none"
-                    />
-                    <button
-                      onClick={() => rename(c.id)}
-                      disabled={busy}
-                      className="h-8 shrink-0 rounded-lg bg-accent px-2.5 text-xs font-medium text-white disabled:opacity-50"
-                    >
-                      Save
-                    </button>
-                  </div>
-                ) : (
+              {catalogs.map((c) => {
+                if (renamingId === c.id) {
+                  return (
+                    <div key={c.id} className="flex items-center gap-1 p-1">
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") rename(c.id);
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        className="h-8 min-w-0 flex-1 rounded-lg border border-accent px-2.5 text-sm outline-none"
+                      />
+                      <button
+                        onClick={() => rename(c.id)}
+                        disabled={busy}
+                        className="h-8 shrink-0 rounded-lg bg-accent px-2.5 text-xs font-medium text-white disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  );
+                }
+                if (confirmingId === c.id) {
+                  return (
+                    <div key={c.id} className="flex items-center gap-1 p-1">
+                      <span className="min-w-0 flex-1 px-1.5 text-xs leading-tight text-muted">
+                        Delete and all its items?
+                      </span>
+                      <button
+                        onClick={() => remove(c.id)}
+                        disabled={busy}
+                        className="h-8 shrink-0 rounded-lg bg-red-600 px-2.5 text-xs font-medium text-white disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmingId(null)}
+                        className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium text-muted hover:bg-zinc-100"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  );
+                }
+                return (
                   <div
                     key={c.id}
                     className="group flex items-center rounded-lg hover:bg-zinc-100"
@@ -134,13 +187,22 @@ export function CatalogSwitcher({
                         setRenameValue(c.name);
                       }}
                       aria-label={`Rename ${c.name}`}
-                      className="mr-1 shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-foreground"
+                      className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-foreground"
                     >
                       <PencilIcon className="size-4" />
                     </button>
+                    {catalogs.length > 1 && (
+                      <button
+                        onClick={() => setConfirmingId(c.id)}
+                        aria-label={`Delete ${c.name}`}
+                        className="mr-1 shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-red-100 hover:text-red-600"
+                      >
+                        <TrashIcon className="size-4" />
+                      </button>
+                    )}
                   </div>
-                ),
-              )}
+                );
+              })}
             </div>
 
             <div className="my-1 h-px bg-border" />
@@ -223,6 +285,13 @@ function PencilIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
       <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       <path d="M13.5 6.5l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
