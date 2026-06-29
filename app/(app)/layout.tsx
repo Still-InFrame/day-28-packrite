@@ -18,10 +18,15 @@ export default async function AppLayout({
   // Bootstrap a default catalog on first visit so capture always has a home.
   await getOrCreateCatalogs(supabase, user.id);
 
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const isAdmin = Boolean(
+    adminEmail && user.email?.trim().toLowerCase() === adminEmail,
+  );
+
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
       {children}
-      <BottomNav />
+      <BottomNav isAdmin={isAdmin} />
     </div>
   );
 }

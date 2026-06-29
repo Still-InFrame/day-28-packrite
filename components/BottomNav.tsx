@@ -4,14 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 
-const tabs = [
+const baseTabs = [
   { href: "/", label: "Capture", icon: CameraIcon },
   { href: "/catalog", label: "Catalog", icon: GridIcon },
   { href: "/settings", label: "Settings", icon: GearIcon },
 ];
 
-export function BottomNav() {
+export function BottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const tabs = isAdmin
+    ? [...baseTabs, { href: "/admin", label: "Insights", icon: ChartIcon }]
+    : baseTabs;
 
   return (
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-[480px] justify-center pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -63,6 +66,14 @@ function GridIcon({ className }: { className?: string }) {
       <rect x="13.5" y="3.5" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
       <rect x="3.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
       <rect x="13.5" y="13.5" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path d="M4 19V5M4 19h16M8 19v-6M12 19V9M16 19v-9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

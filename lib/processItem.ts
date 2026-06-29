@@ -110,6 +110,7 @@ export async function processItem(
         primary_color: vision.primary_color,
         color_hex: vision.color_hex,
         category: vision.category,
+        cataloged_at: new Date().toISOString(),
       })
       .eq("id", item.id);
 

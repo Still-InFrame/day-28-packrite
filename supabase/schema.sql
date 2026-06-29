@@ -39,6 +39,7 @@ create table if not exists public.packrite_catalog_items (
   user_id       uuid not null references auth.users (id) on delete cascade,
   catalog_id    uuid not null references public.packrite_catalogs (id) on delete cascade,
   created_at    timestamptz not null default now(),
+  cataloged_at  timestamptz, -- set when status -> done (telemetry: catalog time)
   image_path    text,
   status        text not null default 'pending'
                 check (status in ('pending', 'processing', 'done', 'error')),
