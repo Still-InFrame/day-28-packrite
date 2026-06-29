@@ -59,6 +59,9 @@ function Dashboard({ data, adminId }: { data: Telemetry; adminId: string }) {
   const keyPct = totals.users
     ? Math.round((totals.usersWithKey / totals.users) * 100)
     : 0;
+  const unlimitedPct = totals.users
+    ? Math.round((totals.unlimited / totals.users) * 100)
+    : 0;
 
   return (
     <>
@@ -66,14 +69,19 @@ function Dashboard({ data, adminId }: { data: Telemetry; adminId: string }) {
       <div className="mt-6 grid grid-cols-2 gap-3">
         <Kpi label="Users" value={totals.users} sub={`${active.d7} active this week`} />
         <Kpi
+          label="Unlimited"
+          value={totals.unlimited}
+          sub={`${unlimitedPct}% of users (paid + comp)`}
+        />
+        <Kpi
           label="Items cataloged"
           value={totals.done}
           sub={`${totals.items} captured total`}
         />
         <Kpi
-          label="Claude key adoption"
+          label="Own-key users"
           value={`${keyPct}%`}
-          sub={`${totals.usersWithKey}/${totals.users} users`}
+          sub={`${totals.usersWithKey}/${totals.users} on their own key`}
         />
         <Kpi
           label="Avg catalog time"
@@ -88,9 +96,9 @@ function Dashboard({ data, adminId }: { data: Telemetry; adminId: string }) {
         <Kpi
           label="Errors"
           value={totals.error}
-          sub={`${totals.catalogs} buckets`}
           danger={totals.error > 0}
         />
+        <Kpi label="Buckets" value={totals.catalogs} />
       </div>
 
       {/* Charts */}
@@ -118,6 +126,17 @@ function Dashboard({ data, adminId }: { data: Telemetry; adminId: string }) {
             />
           )}
         </div>
+
+        {data.usStates.data.length > 0 && (
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <h3 className="text-sm font-semibold">U.S. states</h3>
+            <p className="mb-3 text-xs text-muted">By IP region</p>
+            <CountryPie
+              labels={data.usStates.labels}
+              data={data.usStates.data}
+            />
+          </div>
+        )}
       </div>
 
       {/* Users */}

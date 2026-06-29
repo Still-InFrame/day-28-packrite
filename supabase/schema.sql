@@ -312,3 +312,60 @@ begin
 end;
 $$;
 grant execute on function public.packrite_use_shared_quota(uuid, int) to authenticated, service_role;
+
+-- ===========================================================================
+-- Subscriptions / lifetime free tier (supersedes the per-day packrite_shared_usage
+-- objects above). Unlimited = active Stripe sub OR admin grant OR own API key.
+-- ===========================================================================
+drop function if exists public.packrite_use_shared_quota(uuid, int);
+drop table if exists public.packrite_shared_usage;
+
+alter table public.packrite_user_meta add column if not exists region text;
+
+create table if not exists public.packrite_subscriptions (
+  user_id                uuid primary key references auth.users (id) on delete cascade,
+  plan                   text not null default 'free' check (plan in ('free','unlimited')),
+  source                 text not null default 'none' check (source in ('none','stripe','admin')),
+  status                 text,
+  stripe_customer_id     text,
+  stripe_subscription_id text,
+  current_period_end     timestamptz,
+  free_used              int not null default 0,
+  updated_at             timestamptz not null default now()
+);
+alter table public.packrite_subscriptions enable row level security;
+create policy "packrite_sub_select_own" on public.packrite_subscriptions
+  for select using (auth.uid() = user_id);
+
+create or replace function public.packrite_use_free_quota(p_user uuid, p_limit int)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and p_user <> auth.uid() then raise exception 'forbidden'; end if;
+  insert into public.packrite_subscriptions (user_id) values (p_user)
+    on conflict (user_id) do nothing;
+  if exists (select 1 from public.packrite_subscriptions s
+             where s.user_id = p_user and s.plan = 'unlimited') then
+    return true;
+  end if;
+  update public.packrite_subscriptions set free_used = free_used + 1, updated_at = now()
+    where user_id = p_user and free_used < p_limit;
+  return found;
+end;
+$$;
+grant execute on function public.packrite_use_free_quota(uuid, int) to authenticated, service_role;
+
+create or replace function public.packrite_admin_set_plan(p_target uuid, p_unlimited boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.packrite_is_admin() then raise exception 'forbidden'; end if;
+  insert into public.packrite_subscriptions (user_id, plan, source)
+    values (p_target,
+            case when p_unlimited then 'unlimited' else 'free' end,
+            case when p_unlimited then 'admin' else 'none' end)
+    on conflict (user_id) do update set
+      plan = case when p_unlimited then 'unlimited' else 'free' end,
+      source = case when p_unlimited then 'admin' else 'none' end,
+      updated_at = now();
+end;
+$$;
+grant execute on function public.packrite_admin_set_plan(uuid, boolean) to authenticated;

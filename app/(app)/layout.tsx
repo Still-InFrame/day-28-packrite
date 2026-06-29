@@ -19,16 +19,21 @@ export default async function AppLayout({
   // Bootstrap a default catalog on first visit so capture always has a home.
   await getOrCreateCatalogs(supabase, user.id);
 
-  // Record the user's country from Vercel's edge geolocation (no extra API,
-  // no user input). Header is absent in local dev — captured once live.
-  const country = (await headers()).get("x-vercel-ip-country");
+  // Record the user's country + region (US state) from Vercel's edge
+  // geolocation (no extra API, no user input). Absent in local dev.
+  const hdrs = await headers();
+  const country = hdrs.get("x-vercel-ip-country");
+  const region = hdrs.get("x-vercel-ip-country-region");
   if (country && /^[A-Z]{2}$/.test(country)) {
-    await supabase
-      .from("packrite_user_meta")
-      .upsert(
-        { user_id: user.id, country, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" },
-      );
+    await supabase.from("packrite_user_meta").upsert(
+      {
+        user_id: user.id,
+        country,
+        region: region ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
   }
 
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();

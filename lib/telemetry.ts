@@ -13,6 +13,9 @@ export interface AdminUserRow {
   banned: boolean;
   items: number;
   hasKey: boolean;
+  plan: "free" | "unlimited";
+  source: "none" | "stripe" | "admin";
+  country: string | null;
 }
 
 export interface Telemetry {
@@ -24,6 +27,7 @@ export interface Telemetry {
     pending: number;
     error: number;
     usersWithKey: number;
+    unlimited: number;
     catalogs: number;
   };
   active: { d7: number; d30: number };
@@ -32,6 +36,7 @@ export interface Telemetry {
   scans: { day: Series; week: Series; month: Series };
   scansByHour: number[];
   countries: Series;
+  usStates: Series;
   users: AdminUserRow[];
 }
 
@@ -48,6 +53,10 @@ interface OverviewRow {
     has_key: boolean;
     last_item_at: string | null;
     country: string | null;
+    region: string | null;
+    plan: "free" | "unlimited";
+    source: "none" | "stripe" | "admin";
+    free_used: number;
   }>;
   items: Array<{
     status: string;
@@ -102,6 +111,7 @@ export async function getTelemetry(): Promise<Telemetry> {
     pending: items.filter((i) => i.status === "pending").length,
     error: items.filter((i) => i.status === "error").length,
     usersWithKey: users.filter((u) => u.has_key).length,
+    unlimited: users.filter((u) => u.plan === "unlimited").length,
     catalogs: o.catalogs ?? 0,
   };
 
@@ -143,7 +153,16 @@ export async function getTelemetry(): Promise<Telemetry> {
   const scansByHour = new Array(24).fill(0) as number[];
   for (const d of captureDates) scansByHour[etHour(d)] += 1;
 
-  const countries = countryDistribution(users.map((u) => u.country));
+  const countries = distribution(
+    users.map((u) => u.country),
+    regionName,
+  );
+  const usStates = distribution(
+    users
+      .filter((u) => (u.country ?? "").toUpperCase() === "US")
+      .map((u) => u.region),
+    (c) => c,
+  );
 
   return {
     totals,
@@ -161,6 +180,7 @@ export async function getTelemetry(): Promise<Telemetry> {
     },
     scansByHour,
     countries,
+    usStates,
     users: users
       .map((u) => ({
         id: u.id,
@@ -170,6 +190,9 @@ export async function getTelemetry(): Promise<Telemetry> {
         banned: u.banned,
         items: u.items,
         hasKey: u.has_key,
+        plan: u.plan,
+        source: u.source,
+        country: u.country,
       }))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
   };
@@ -187,18 +210,21 @@ function regionName(code: string): string {
   }
 }
 
-function countryDistribution(codes: Array<string | null>): Series {
+function distribution(
+  values: Array<string | null>,
+  labelFn: (code: string) => string,
+  top = 6,
+): Series {
   const counts = new Map<string, number>();
-  for (const c of codes) {
-    const key = c && /^[A-Za-z]{2}$/.test(c) ? c.toUpperCase() : "??";
+  for (const v of values) {
+    const key = v && v.trim() ? v.trim().toUpperCase() : "??";
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  const TOP = 6;
-  const top = sorted.slice(0, TOP);
-  const rest = sorted.slice(TOP).reduce((s, [, n]) => s + n, 0);
-  const labels = top.map(([c]) => regionName(c));
-  const data = top.map(([, n]) => n);
+  const topN = sorted.slice(0, top);
+  const rest = sorted.slice(top).reduce((s, [, n]) => s + n, 0);
+  const labels = topN.map(([c]) => (c === "??" ? "Unknown" : labelFn(c)));
+  const data = topN.map(([, n]) => n);
   if (rest > 0) {
     labels.push("Other");
     data.push(rest);

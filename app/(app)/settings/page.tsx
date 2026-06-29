@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { KeyManager } from "@/components/KeyManager";
+import { PlanCard } from "@/components/PlanCard";
 import { SignOutButton } from "@/components/SignOutButton";
 import { Wordmark } from "@/components/Brand";
 
@@ -8,6 +9,15 @@ export default async function SettingsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const { data: sub } = await supabase
+    .from("packrite_subscriptions")
+    .select("plan, source, free_used")
+    .maybeSingle();
+  const { data: keyRow } = await supabase
+    .from("packrite_user_api_keys")
+    .select("user_id")
+    .maybeSingle();
 
   return (
     <div className="flex-1 px-5 pb-28 pt-8">
@@ -21,6 +31,13 @@ export default async function SettingsPage() {
       </p>
 
       <div className="mt-6 flex flex-col gap-4">
+        <PlanCard
+          plan={(sub?.plan as "free" | "unlimited") ?? "free"}
+          source={(sub?.source as "none" | "stripe" | "admin") ?? "none"}
+          hasKey={Boolean(keyRow)}
+          freeUsed={sub?.free_used ?? 0}
+          limit={30}
+        />
         <KeyManager />
 
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">

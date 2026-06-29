@@ -6,9 +6,9 @@ import type { CatalogVision } from "@/lib/types";
 // Current Claude Sonnet vision model.
 const VISION_MODEL = "claude-sonnet-4-6";
 
-// Free catalogs/day on the app's shared key (ANTHROPIC_API_KEY). Users who add
-// their own key are unlimited and never counted against this.
-const SHARED_DAILY_LIMIT = 30;
+// Lifetime free catalogs on the app's shared key (ANTHROPIC_API_KEY). After
+// this, users need an unlimited plan (subscription/admin grant) or their own key.
+const FREE_LIMIT = 30;
 
 const PROMPT = `You are cataloging a single physical item from a photo for a packing inventory.
 Return ONLY raw JSON — no markdown, no backticks, no preamble — in exactly this shape:
@@ -61,10 +61,11 @@ export async function processItem(
         authTag: keyRow.auth_tag,
       });
     } else if (process.env.ANTHROPIC_API_KEY) {
-      // Free tier: charge one unit of today's shared-key quota.
-      const { data: allowed } = await supabase.rpc("packrite_use_shared_quota", {
+      // Free tier: spend one of the user's lifetime free catalogs (unlimited
+      // plans pass without consuming).
+      const { data: allowed } = await supabase.rpc("packrite_use_free_quota", {
         p_user: item.user_id,
-        p_limit: SHARED_DAILY_LIMIT,
+        p_limit: FREE_LIMIT,
       });
       if (allowed === false) {
         await supabase

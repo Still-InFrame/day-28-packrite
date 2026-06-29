@@ -22,7 +22,9 @@ export function UserList({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function act(userId: string, action: "ban" | "unban" | "delete") {
+  type Action = "ban" | "unban" | "delete" | "grant" | "revoke";
+
+  async function act(userId: string, action: Action) {
     setBusy(userId);
     setError(null);
     const res = await fetch("/api/admin/user", {
@@ -39,13 +41,18 @@ export function UserList({
     }
     if (action === "delete") {
       setUsers((prev) => prev.filter((u) => u.id !== userId));
-    } else {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === userId ? { ...u, banned: action === "ban" } : u,
-        ),
-      );
+      return;
     }
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id !== userId) return u;
+        if (action === "ban") return { ...u, banned: true };
+        if (action === "unban") return { ...u, banned: false };
+        if (action === "grant")
+          return { ...u, plan: "unlimited" as const, source: "admin" as const };
+        return { ...u, plan: "free" as const, source: "none" as const };
+      }),
+    );
   }
 
   return (
@@ -67,16 +74,23 @@ export function UserList({
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                    u.hasKey
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-zinc-100 text-zinc-500",
-                  )}
-                >
-                  {u.hasKey ? "Key set" : "No key"}
-                </span>
+                {u.plan === "unlimited" ? (
+                  <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">
+                    {u.source === "admin"
+                      ? "Unlimited · comp"
+                      : u.source === "stripe"
+                        ? "Unlimited · paid"
+                        : "Unlimited"}
+                  </span>
+                ) : u.hasKey ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                    Own key
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-500">
+                    Free
+                  </span>
+                )}
                 {u.banned && (
                   <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
                     Blocked
@@ -110,7 +124,16 @@ export function UserList({
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  <button
+                    onClick={() =>
+                      act(u.id, u.plan === "unlimited" ? "revoke" : "grant")
+                    }
+                    disabled={working}
+                    className="rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent hover:opacity-80 disabled:opacity-50"
+                  >
+                    {u.plan === "unlimited" ? "Make free" : "Grant unlimited"}
+                  </button>
                   <button
                     onClick={() => act(u.id, u.banned ? "unban" : "ban")}
                     disabled={working}

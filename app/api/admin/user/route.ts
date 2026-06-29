@@ -14,7 +14,8 @@ export async function POST(request: Request) {
     .json()
     .catch(() => ({}) as { userId?: string; action?: string });
 
-  if (!userId || !["ban", "unban", "delete"].includes(action)) {
+  const actions = ["ban", "unban", "delete", "grant", "revoke"];
+  if (!userId || !actions.includes(action as string)) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
 
@@ -22,10 +23,15 @@ export async function POST(request: Request) {
   const { error } =
     action === "delete"
       ? await supabase.rpc("packrite_admin_delete_user", { p_target: userId })
-      : await supabase.rpc("packrite_admin_set_blocked", {
-          p_target: userId,
-          p_blocked: action === "ban",
-        });
+      : action === "grant" || action === "revoke"
+        ? await supabase.rpc("packrite_admin_set_plan", {
+            p_target: userId,
+            p_unlimited: action === "grant",
+          })
+        : await supabase.rpc("packrite_admin_set_blocked", {
+            p_target: userId,
+            p_blocked: action === "ban",
+          });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
