@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/Brand";
+import { LegalNav } from "@/components/LegalNav";
 
 export const CONTACT_EMAIL = "savion@stillinframe.com";
 
@@ -30,26 +31,8 @@ export function LegalShell({
       <p className="mt-2 text-sm text-muted">Last updated {updated}</p>
 
       <div className="mt-8 gap-10 md:grid md:grid-cols-[210px_minmax(0,1fr)]">
-        {/* Table of contents — sticky on desktop, hidden on mobile */}
-        <nav className="hidden md:block">
-          <div className="sticky top-10">
-            <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              On this page
-            </p>
-            <ul className="space-y-0.5">
-              {sections.map((s) => (
-                <li key={s.id}>
-                  <a
-                    href={`#${s.id}`}
-                    className="block rounded-md px-2 py-1.5 text-sm leading-snug text-muted transition-colors hover:bg-zinc-100 hover:text-foreground"
-                  >
-                    {s.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </nav>
+        {/* Table of contents — sticky on desktop, hidden on mobile, scroll-spy */}
+        <LegalNav items={sections.map((s) => ({ id: s.id, title: s.title }))} />
 
         {/* Content */}
         <div className="min-w-0 space-y-7">
