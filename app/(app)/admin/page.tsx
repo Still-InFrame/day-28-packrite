@@ -98,7 +98,7 @@ function Dashboard({ data, adminId }: { data: Telemetry; adminId: string }) {
 
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <h3 className="text-sm font-semibold">When scans come in</h3>
-          <p className="mb-3 text-xs text-muted">Captures by hour of day</p>
+          <p className="mb-3 text-xs text-muted">Captures by hour of day (ET)</p>
           <LineChart labels={HOUR_LABELS} data={data.scansByHour} color="#0891b2" />
         </div>
 

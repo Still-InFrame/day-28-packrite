@@ -56,6 +56,30 @@ interface OverviewRow {
 
 const DAY = 86_400_000;
 
+// All time-of-day / calendar bucketing is done in Eastern Time, regardless of
+// where the server runs (Vercel runs in UTC).
+const TZ = "America/New_York";
+const ET_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const ET_HOUR = new Intl.DateTimeFormat("en-US", {
+  timeZone: TZ,
+  hour: "2-digit",
+  hour12: false,
+  hourCycle: "h23",
+});
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const etDateKey = (d: Date) => ET_DATE.format(d); // "YYYY-MM-DD" in ET
+const etHour = (d: Date) => parseInt(ET_HOUR.format(d), 10) % 24;
+const mdLabel = (key: string) => {
+  const [, m, d] = key.split("-");
+  return `${+m}/${+d}`;
+};
+
 // No service-role key: the admin-gated SECURITY DEFINER RPC reads auth.users for
 // us and returns the raw data; we aggregate the time-series here.
 export async function getTelemetry(): Promise<Telemetry> {
@@ -115,7 +139,7 @@ export async function getTelemetry(): Promise<Telemetry> {
   const signupDates = users.map((u) => new Date(u.created_at));
   const captureDates = items.map((i) => new Date(i.created_at));
   const scansByHour = new Array(24).fill(0) as number[];
-  for (const d of captureDates) scansByHour[d.getHours()] += 1;
+  for (const d of captureDates) scansByHour[etHour(d)] += 1;
 
   return {
     totals,
@@ -149,14 +173,14 @@ function bucketDaily(dates: Date[], now: Date, days: number): Series {
   const data: number[] = [];
   const index = new Map<string, number>();
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * DAY);
-    const key = d.toISOString().slice(0, 10);
+    const key = etDateKey(new Date(now.getTime() - i * DAY));
+    if (index.has(key)) continue; // DST edge — merge the rare duplicate day
     index.set(key, labels.length);
-    labels.push(`${d.getMonth() + 1}/${d.getDate()}`);
+    labels.push(mdLabel(key));
     data.push(0);
   }
   for (const d of dates) {
-    const idx = index.get(d.toISOString().slice(0, 10));
+    const idx = index.get(etDateKey(d));
     if (idx !== undefined) data[idx] += 1;
   }
   return { labels, data };
@@ -169,8 +193,7 @@ function bucketWeekly(dates: Date[], now: Date, weeks: number): Series {
   for (let i = weeks - 1; i >= 0; i--) {
     const start = now.getTime() - i * 7 * DAY - 7 * DAY;
     starts.push(start);
-    const d = new Date(start);
-    labels.push(`${d.getMonth() + 1}/${d.getDate()}`);
+    labels.push(mdLabel(etDateKey(new Date(start))));
     data.push(0);
   }
   for (const d of dates) {
@@ -189,15 +212,23 @@ function bucketMonthly(dates: Date[], now: Date, months: number): Series {
   const labels: string[] = [];
   const data: number[] = [];
   const index = new Map<string, number>();
-  const fmt = new Intl.DateTimeFormat("en", { month: "short" });
+  const nowKey = etDateKey(now); // YYYY-MM-DD in ET
+  const y = Number(nowKey.slice(0, 4));
+  const m = Number(nowKey.slice(5, 7)); // 1-12
   for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    index.set(`${d.getFullYear()}-${d.getMonth()}`, labels.length);
-    labels.push(fmt.format(d));
+    let mm = m - i;
+    let yy = y;
+    while (mm <= 0) {
+      mm += 12;
+      yy -= 1;
+    }
+    const key = `${yy}-${String(mm).padStart(2, "0")}`;
+    index.set(key, labels.length);
+    labels.push(MONTHS[mm - 1]);
     data.push(0);
   }
   for (const d of dates) {
-    const idx = index.get(`${d.getFullYear()}-${d.getMonth()}`);
+    const idx = index.get(etDateKey(d).slice(0, 7));
     if (idx !== undefined) data[idx] += 1;
   }
   return { labels, data };
