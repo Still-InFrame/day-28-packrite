@@ -1,8 +1,24 @@
 import { Wordmark } from "@/components/Brand";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { Catalog, CatalogItem } from "@/lib/types";
+import { createPublicClient } from "@/lib/supabase/public";
 
 export const dynamic = "force-dynamic";
+
+interface SharedCatalog {
+  id: string;
+  name: string;
+}
+interface SharedItem {
+  id: string;
+  image_path: string | null;
+  description: string | null;
+  brand: string | null;
+  primary_color: string | null;
+  color_hex: string | null;
+  category: string | null;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function SharePage({
   params,
@@ -10,49 +26,33 @@ export default async function SharePage({
   params: Promise<{ share_id: string }>;
 }) {
   const { share_id } = await params;
+  if (!UUID_RE.test(share_id)) return <Unavailable />;
 
-  let catalog: Catalog | null = null;
-  let items: CatalogItem[] = [];
+  const supabase = createPublicClient();
   const signed: Record<string, string> = {};
 
-  try {
-    const admin = createAdminClient();
-
-    const { data: cat } = await admin
-      .from("packrite_catalogs")
-      .select("*")
-      .eq("share_id", share_id)
-      .eq("is_shared", true)
-      .maybeSingle();
-
-    if (cat) {
-      catalog = cat as Catalog;
-      const { data: rows } = await admin
-        .from("packrite_catalog_items")
-        .select("*")
-        .eq("catalog_id", catalog.id)
-        .eq("status", "done")
-        .order("created_at", { ascending: false });
-      items = (rows as CatalogItem[]) ?? [];
-
-      const paths = items
-        .map((i) => i.image_path)
-        .filter((p): p is string => Boolean(p));
-      if (paths.length) {
-        const { data: urls } = await admin.storage
-          .from("item-photos")
-          .createSignedUrls(paths, 3600);
-        for (const u of urls ?? []) {
-          if (u.path && u.signedUrl) signed[u.path] = u.signedUrl;
-        }
-      }
-    }
-  } catch {
-    // Service role not configured — treat as unavailable.
-    catalog = null;
-  }
-
+  const { data: cats } = await supabase.rpc("packrite_shared_catalog", {
+    p_share_id: share_id,
+  });
+  const catalog = (cats?.[0] as SharedCatalog | undefined) ?? null;
   if (!catalog) return <Unavailable />;
+
+  const { data: itemRows } = await supabase.rpc("packrite_shared_items", {
+    p_share_id: share_id,
+  });
+  const items = (itemRows as SharedItem[] | null) ?? [];
+
+  const paths = items
+    .map((i) => i.image_path)
+    .filter((p): p is string => Boolean(p));
+  if (paths.length) {
+    const { data: urls } = await supabase.storage
+      .from("item-photos")
+      .createSignedUrls(paths, 3600);
+    for (const u of urls ?? []) {
+      if (u.path && u.signedUrl) signed[u.path] = u.signedUrl;
+    }
+  }
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-3xl px-5 pb-16 pt-10">

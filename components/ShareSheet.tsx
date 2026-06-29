@@ -89,14 +89,14 @@ export function ShareSheet({
             disabled={busy}
             onClick={() => setShared(!isShared)}
             className={cn(
-              "relative h-6 w-11 rounded-full transition-colors",
+              "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 disabled:opacity-60",
               isShared ? "bg-accent" : "bg-zinc-300",
             )}
           >
             <span
               className={cn(
-                "absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform",
-                isShared ? "translate-x-[1.4rem]" : "translate-x-0.5",
+                "inline-block size-5 rounded-full bg-white shadow-sm transition-transform duration-200",
+                isShared ? "translate-x-6" : "translate-x-1",
               )}
             />
           </button>

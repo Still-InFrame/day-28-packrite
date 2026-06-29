@@ -130,3 +130,51 @@ create policy "packrite_item_photos_delete_own" on storage.objects
   for delete using (
     bucket_id = 'item-photos' and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ===========================================================================
+-- Public share links (no service-role key needed). SECURITY DEFINER functions
+-- return only the rows for the supplied share_id — a caller must know the
+-- unguessable UUID, and user_id/share_id are never exposed.
+-- ===========================================================================
+create or replace function public.packrite_shared_catalog(p_share_id uuid)
+returns table (id uuid, name text, created_at timestamptz)
+language sql
+security definer
+set search_path = public
+as $$
+  select c.id, c.name, c.created_at
+  from public.packrite_catalogs c
+  where c.share_id = p_share_id and c.is_shared = true
+$$;
+
+create or replace function public.packrite_shared_items(p_share_id uuid)
+returns table (
+  id uuid, image_path text, description text, brand text,
+  primary_color text, color_hex text, category text, created_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select i.id, i.image_path, i.description, i.brand,
+         i.primary_color, i.color_hex, i.category, i.created_at
+  from public.packrite_catalog_items i
+  join public.packrite_catalogs c on c.id = i.catalog_id
+  where c.share_id = p_share_id and c.is_shared = true and i.status = 'done'
+  order by i.created_at desc
+$$;
+
+grant execute on function public.packrite_shared_catalog(uuid) to anon, authenticated;
+grant execute on function public.packrite_shared_items(uuid) to anon, authenticated;
+
+-- Anyone may read (and sign a URL for) a photo that belongs to a shared item.
+create policy "packrite_item_photos_shared_read" on storage.objects
+  for select using (
+    bucket_id = 'item-photos'
+    and exists (
+      select 1
+      from public.packrite_catalog_items i
+      join public.packrite_catalogs c on c.id = i.catalog_id
+      where i.image_path = name and c.is_shared = true
+    )
+  );
