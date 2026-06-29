@@ -32,8 +32,10 @@ export async function updateSession(request: NextRequest) {
   const url = request.nextUrl;
   const isAuthRoute =
     url.pathname.startsWith("/login") || url.pathname.startsWith("/auth");
-  // Add any other public route prefixes here (e.g. "/share").
-  const isPublic = false;
+  // Public read-only share links, plus API routes (which do their own auth — the
+  // DB webhook hits /api/catalog with a secret and no session cookie).
+  const isPublic =
+    url.pathname.startsWith("/share") || url.pathname.startsWith("/api");
 
   if (!user && !isAuthRoute && !isPublic) {
     const redirect = url.clone();
