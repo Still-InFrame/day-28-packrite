@@ -116,9 +116,35 @@ export function KeyManager() {
               </Button>
             )}
           </div>
-          <p className="text-xs text-zinc-400">
-            Get a key at console.anthropic.com → API Keys.
-          </p>
+          <div className="rounded-xl bg-zinc-50 p-3.5 text-xs leading-5 text-muted">
+            <p className="mb-1.5 text-sm font-medium text-foreground">
+              How to get a Claude API key
+            </p>
+            <ol className="ml-4 list-decimal space-y-1.5">
+              <li>
+                Go to{" "}
+                <a
+                  href="https://console.anthropic.com/settings/keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-accent hover:underline"
+                >
+                  console.anthropic.com → API Keys
+                </a>{" "}
+                and sign in (or create a free account).
+              </li>
+              <li>
+                Click <span className="font-medium">Create Key</span>, give it a
+                name, and copy the value — it starts with{" "}
+                <code className="rounded bg-zinc-200 px-1 py-0.5">sk-ant-</code>.
+              </li>
+              <li>
+                Add a little credit under{" "}
+                <span className="font-medium">Billing</span> (cataloging a photo
+                costs a fraction of a cent), then paste the key above.
+              </li>
+            </ol>
+          </div>
         </div>
       )}
     </div>
