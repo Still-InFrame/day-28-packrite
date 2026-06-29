@@ -3,6 +3,7 @@ import { getAdminUser } from "@/lib/admin";
 import { getTelemetry, type Telemetry } from "@/lib/telemetry";
 import { LineChart } from "@/components/admin/LineChart";
 import { RangeChart } from "@/components/admin/RangeChart";
+import { CountryPie } from "@/components/admin/CountryPie";
 import { UserList } from "@/components/admin/UserList";
 import { Wordmark } from "@/components/Brand";
 
@@ -101,6 +102,21 @@ function Dashboard({ data, adminId }: { data: Telemetry; adminId: string }) {
           <h3 className="text-sm font-semibold">When scans come in</h3>
           <p className="mb-3 text-xs text-muted">Captures by hour of day (ET)</p>
           <LineChart labels={HOUR_LABELS} data={data.scansByHour} color="#0891b2" />
+        </div>
+
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <h3 className="text-sm font-semibold">Where users are</h3>
+          <p className="mb-3 text-xs text-muted">By IP country</p>
+          {data.countries.data.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted">
+              No location data yet.
+            </p>
+          ) : (
+            <CountryPie
+              labels={data.countries.labels}
+              data={data.countries.data}
+            />
+          )}
         </div>
       </div>
 

@@ -31,6 +31,7 @@ export interface Telemetry {
   signups: { day: Series; week: Series; month: Series };
   scans: { day: Series; week: Series; month: Series };
   scansByHour: number[];
+  countries: Series;
   users: AdminUserRow[];
 }
 
@@ -46,6 +47,7 @@ interface OverviewRow {
     items: number;
     has_key: boolean;
     last_item_at: string | null;
+    country: string | null;
   }>;
   items: Array<{
     status: string;
@@ -141,6 +143,8 @@ export async function getTelemetry(): Promise<Telemetry> {
   const scansByHour = new Array(24).fill(0) as number[];
   for (const d of captureDates) scansByHour[etHour(d)] += 1;
 
+  const countries = countryDistribution(users.map((u) => u.country));
+
   return {
     totals,
     active: { d7, d30 },
@@ -156,6 +160,7 @@ export async function getTelemetry(): Promise<Telemetry> {
       month: bucketMonthly(captureDates, now, 12),
     },
     scansByHour,
+    countries,
     users: users
       .map((u) => ({
         id: u.id,
@@ -168,6 +173,37 @@ export async function getTelemetry(): Promise<Telemetry> {
       }))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
   };
+}
+
+// --- country distribution --------------------------------------------------
+
+const REGION = new Intl.DisplayNames(["en"], { type: "region" });
+function regionName(code: string): string {
+  if (code === "??") return "Unknown";
+  try {
+    return REGION.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+function countryDistribution(codes: Array<string | null>): Series {
+  const counts = new Map<string, number>();
+  for (const c of codes) {
+    const key = c && /^[A-Za-z]{2}$/.test(c) ? c.toUpperCase() : "??";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const TOP = 6;
+  const top = sorted.slice(0, TOP);
+  const rest = sorted.slice(TOP).reduce((s, [, n]) => s + n, 0);
+  const labels = top.map(([c]) => regionName(c));
+  const data = top.map(([, n]) => n);
+  if (rest > 0) {
+    labels.push("Other");
+    data.push(rest);
+  }
+  return { labels, data };
 }
 
 // --- bucketing helpers -----------------------------------------------------

@@ -64,6 +64,20 @@ create table if not exists public.packrite_user_api_keys (
   updated_at timestamptz not null default now()
 );
 
+-- Per-user metadata; country comes from Vercel's IP geolocation header.
+create table if not exists public.packrite_user_meta (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  country    text,
+  updated_at timestamptz not null default now()
+);
+alter table public.packrite_user_meta enable row level security;
+create policy "packrite_meta_select_own" on public.packrite_user_meta
+  for select using (auth.uid() = user_id);
+create policy "packrite_meta_insert_own" on public.packrite_user_meta
+  for insert with check (auth.uid() = user_id);
+create policy "packrite_meta_update_own" on public.packrite_user_meta
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- ===========================================================================
 -- Row Level Security: every user can only touch their own rows.
 -- The server's service-role client bypasses RLS for the webhook + share routes.
@@ -201,7 +215,7 @@ begin
           au.last_sign_in_at,
           (au.banned_until is not null and au.banned_until > now()) as banned,
           coalesce(ic.cnt, 0) as items, (k.user_id is not null) as has_key,
-          ic.last_item_at
+          ic.last_item_at, m.country
         from auth.users au
         left join (
           select user_id, count(*) cnt, max(created_at) last_item_at,
@@ -213,6 +227,7 @@ begin
           from public.packrite_catalogs group by user_id
         ) cc on cc.user_id = au.id
         left join public.packrite_user_api_keys k on k.user_id = au.id
+        left join public.packrite_user_meta m on m.user_id = au.id
         -- shared sandbox: only users who've actually used packrite
         where cc.user_id is not null or ic.cnt is not null or k.user_id is not null
       ) u
