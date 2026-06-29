@@ -6,10 +6,10 @@ import {
   EmbeddedCheckoutProvider,
 } from "@stripe/react-stripe-js";
 
-// Loaded once. Empty key just means the form won't init (publishable key unset).
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "",
-);
+// Loaded once. Null when the publishable key is missing from the bundle, so we
+// can show a clear message instead of a blank sheet.
+const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+const stripePromise = PUBLISHABLE_KEY ? loadStripe(PUBLISHABLE_KEY) : null;
 
 export function CheckoutSheet({
   clientSecret,
@@ -34,9 +34,19 @@ export function CheckoutSheet({
             </svg>
           </button>
         </div>
-        <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
-          <EmbeddedCheckout />
-        </EmbeddedCheckoutProvider>
+        {stripePromise ? (
+          <EmbeddedCheckoutProvider
+            stripe={stripePromise}
+            options={{ clientSecret }}
+          >
+            <EmbeddedCheckout />
+          </EmbeddedCheckoutProvider>
+        ) : (
+          <p className="px-2 py-8 text-center text-sm text-muted">
+            Payments aren&apos;t fully configured yet
+            (missing publishable key). Please try again shortly.
+          </p>
+        )}
       </div>
     </div>
   );
