@@ -10,9 +10,10 @@ export default function PrivacyPage() {
     <LegalShell title="Privacy Policy" updated="June 29, 2026">
       <Section title="Overview">
         <p>
-          This Privacy Policy explains how packrite (&ldquo;we,&rdquo;
-          &ldquo;us&rdquo;) collects, uses, and shares information when you use
-          the Service. We aim to collect only what we need to run packrite.
+          This Privacy Policy explains how Still In Frame Creatives, LLC
+          (&ldquo;we,&rdquo; &ldquo;us&rdquo;), the operator of packrite,
+          collects, uses, and shares information when you use the Service. We aim
+          to collect only what we need to run packrite.
         </p>
       </Section>
 

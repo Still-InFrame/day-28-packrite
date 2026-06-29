@@ -11,10 +11,10 @@ export default function TermsPage() {
       <Section title="1. Acceptance of these terms">
         <p>
           These Terms of Use (&ldquo;Terms&rdquo;) govern your access to and use
-          of packrite (the &ldquo;Service&rdquo;), operated by packrite
-          (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;). By creating
-          an account or using the Service, you agree to these Terms. If you do
-          not agree, do not use the Service.
+          of packrite (the &ldquo;Service&rdquo;), operated by Still In Frame
+          Creatives, LLC (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or
+          &ldquo;our&rdquo;). By creating an account or using the Service, you
+          agree to these Terms. If you do not agree, do not use the Service.
         </p>
       </Section>
 
@@ -162,9 +162,9 @@ export default function TermsPage() {
 
       <Section title="16. Governing law">
         <p>
-          These Terms are governed by the laws of [your state/country], without
-          regard to its conflict-of-laws rules, and any disputes will be resolved
-          in the courts located there.
+          These Terms are governed by the laws of the State of Florida, United
+          States, without regard to its conflict-of-laws rules, and any disputes
+          will be resolved in the state or federal courts located in Florida.
         </p>
       </Section>
 
