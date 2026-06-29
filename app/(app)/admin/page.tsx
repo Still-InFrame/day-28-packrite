@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getAdminUser } from "@/lib/admin";
 import { getTelemetry, type Telemetry } from "@/lib/telemetry";
 import { LineChart } from "@/components/admin/LineChart";
-import { SignupsChart } from "@/components/admin/SignupsChart";
+import { RangeChart } from "@/components/admin/RangeChart";
 import { UserList } from "@/components/admin/UserList";
 import { Wordmark } from "@/components/Brand";
 
@@ -94,22 +94,13 @@ function Dashboard({ data, adminId }: { data: Telemetry; adminId: string }) {
 
       {/* Charts */}
       <div className="mt-4 flex flex-col gap-4">
-        <SignupsChart signups={data.signups} />
+        <RangeChart title="Signups" series={data.signups} color="#4f46e5" />
+        <RangeChart title="Captures" series={data.scans} color="#7c3aed" />
 
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <h3 className="text-sm font-semibold">When scans come in</h3>
           <p className="mb-3 text-xs text-muted">Captures by hour of day (ET)</p>
           <LineChart labels={HOUR_LABELS} data={data.scansByHour} color="#0891b2" />
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-          <h3 className="text-sm font-semibold">Captures per day</h3>
-          <p className="mb-3 text-xs text-muted">Last 30 days</p>
-          <LineChart
-            labels={data.scansByDay.labels}
-            data={data.scansByDay.data}
-            color="#7c3aed"
-          />
         </div>
       </div>
 

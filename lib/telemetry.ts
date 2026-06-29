@@ -29,8 +29,8 @@ export interface Telemetry {
   active: { d7: number; d30: number };
   catalogSeconds: { avg: number | null; median: number | null; p90: number | null };
   signups: { day: Series; week: Series; month: Series };
+  scans: { day: Series; week: Series; month: Series };
   scansByHour: number[];
-  scansByDay: Series;
   users: AdminUserRow[];
 }
 
@@ -150,8 +150,12 @@ export async function getTelemetry(): Promise<Telemetry> {
       week: bucketWeekly(signupDates, now, 12),
       month: bucketMonthly(signupDates, now, 12),
     },
+    scans: {
+      day: bucketDaily(captureDates, now, 30),
+      week: bucketWeekly(captureDates, now, 12),
+      month: bucketMonthly(captureDates, now, 12),
+    },
     scansByHour,
-    scansByDay: bucketDaily(captureDates, now, 30),
     users: users
       .map((u) => ({
         id: u.id,

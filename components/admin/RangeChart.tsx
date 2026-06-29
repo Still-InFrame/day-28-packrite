@@ -7,22 +7,32 @@ import type { Series } from "@/lib/telemetry";
 
 type Range = "day" | "week" | "month";
 
-export function SignupsChart({
-  signups,
+const RANGE_LABEL: Record<Range, string> = {
+  day: "last 30 days",
+  week: "last 12 weeks",
+  month: "last 12 months",
+};
+
+export function RangeChart({
+  title,
+  series,
+  color = "#4f46e5",
 }: {
-  signups: { day: Series; week: Series; month: Series };
+  title: string;
+  series: { day: Series; week: Series; month: Series };
+  color?: string;
 }) {
   const [range, setRange] = useState<Range>("day");
-  const series = signups[range];
-  const total = series.data.reduce((a, b) => a + b, 0);
+  const s = series[range];
+  const total = s.data.reduce((a, b) => a + b, 0);
 
   return (
     <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">Signups</h3>
+          <h3 className="text-sm font-semibold">{title}</h3>
           <p className="text-xs text-muted">
-            {total} in this {range === "day" ? "month" : `last ${range === "week" ? "12 weeks" : "12 months"}`}
+            {total} · {RANGE_LABEL[range]}
           </p>
         </div>
         <div className="flex gap-1 rounded-lg bg-zinc-100 p-0.5">
@@ -42,7 +52,7 @@ export function SignupsChart({
           ))}
         </div>
       </div>
-      <LineChart labels={series.labels} data={series.data} />
+      <LineChart labels={s.labels} data={s.data} color={color} />
     </div>
   );
 }
