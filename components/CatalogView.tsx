@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useActiveCatalog } from "@/lib/useActiveCatalog";
 import { CatalogSwitcher } from "@/components/CatalogSwitcher";
 import { ShareSheet } from "@/components/ShareSheet";
+import { MoveSheet } from "@/components/MoveSheet";
 import { ItemCard } from "@/components/ItemCard";
 import { Wordmark } from "@/components/Brand";
 import { cn } from "@/lib/cn";
@@ -27,6 +28,9 @@ export function CatalogView({
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [shareOpen, setShareOpen] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [moveIds, setMoveIds] = useState<string[] | null>(null);
 
   const activeCatalog = catalogs.find((c) => c.id === activeId) ?? catalogs[0];
 
@@ -76,6 +80,49 @@ export function CatalogView({
     setItems((prev) => prev.filter((i) => i.id !== id));
   }
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelect() {
+    setSelectMode(false);
+    setSelected(new Set());
+  }
+
+  async function moveItems(ids: string[], targetId: string) {
+    if (ids.length === 0) return;
+    setItems((prev) =>
+      prev.map((i) =>
+        ids.includes(i.id) ? { ...i, catalog_id: targetId } : i,
+      ),
+    );
+    setMoveIds(null);
+    exitSelect();
+    await createClient()
+      .from("packrite_catalog_items")
+      .update({ catalog_id: targetId })
+      .in("id", ids);
+  }
+
+  async function deleteItems(ids: string[]) {
+    const targets = items.filter((i) => ids.includes(i.id));
+    setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
+    exitSelect();
+    const supabase = createClient();
+    await supabase.from("packrite_catalog_items").delete().in("id", ids);
+    const paths = targets
+      .map((i) => i.image_path)
+      .filter((p): p is string => Boolean(p));
+    if (paths.length) {
+      await supabase.storage.from("item-photos").remove(paths);
+    }
+  }
+
   const inCatalog = useMemo(
     () => items.filter((i) => i.catalog_id === activeId),
     [items, activeId],
@@ -113,13 +160,21 @@ export function CatalogView({
     <div className="flex-1 px-4 pb-28 pt-8">
       <header className="mb-5 flex items-center justify-between gap-2">
         <Wordmark />
-        <button
-          onClick={() => setShareOpen(true)}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-2 text-sm font-medium shadow-sm hover:bg-zinc-50"
-        >
-          <ShareIcon className="size-4" />
-          Share
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+            className="rounded-full border border-border bg-surface px-3.5 py-2 text-sm font-medium shadow-sm hover:bg-zinc-50"
+          >
+            {selectMode ? "Cancel" : "Select"}
+          </button>
+          <button
+            onClick={() => setShareOpen(true)}
+            className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-2 text-sm font-medium shadow-sm hover:bg-zinc-50"
+          >
+            <ShareIcon className="size-4" />
+            Share
+          </button>
+        </div>
       </header>
 
       <div className="mb-4 flex items-center gap-2">
@@ -173,10 +228,46 @@ export function CatalogView({
               item={item}
               onChange={upsert}
               onRemove={removeItem}
+              onMove={(id) => setMoveIds([id])}
+              selectable={selectMode}
+              selected={selected.has(item.id)}
+              onToggleSelect={toggleSelect}
             />
           ))}
         </div>
       )}
+
+      {/* Bulk action bar */}
+      {selectMode && selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-[5.5rem] z-40 mx-auto flex max-w-[480px] justify-center px-4">
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-zinc-900/95 p-1.5 text-white shadow-xl backdrop-blur">
+            <span className="px-2.5 text-sm font-medium">
+              {selected.size} selected
+            </span>
+            <button
+              onClick={() => setMoveIds(Array.from(selected))}
+              className="rounded-full bg-white/15 px-3.5 py-1.5 text-sm font-medium hover:bg-white/25"
+            >
+              Move
+            </button>
+            <button
+              onClick={() => deleteItems(Array.from(selected))}
+              className="rounded-full bg-red-500 px-3.5 py-1.5 text-sm font-medium hover:bg-red-600"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
+      <MoveSheet
+        open={moveIds !== null}
+        onClose={() => setMoveIds(null)}
+        catalogs={catalogs}
+        excludeId={activeId}
+        count={moveIds?.length ?? 0}
+        onPick={(targetId) => moveItems(moveIds ?? [], targetId)}
+      />
 
       {activeCatalog && (
         <ShareSheet

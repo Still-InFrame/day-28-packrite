@@ -26,3 +26,25 @@ export async function getOrCreateCatalogs(
   if (insertError) throw insertError;
   return [created as Catalog];
 }
+
+// The per-user "Unassigned" system bucket, created lazily the first time an
+// item needs a home (e.g. its bucket was deleted). Returns its id.
+export async function getOrCreateUnassignedId(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string> {
+  const { data } = await supabase
+    .from("packrite_catalogs")
+    .select("id")
+    .eq("is_system", true)
+    .maybeSingle();
+  if (data) return data.id;
+
+  const { data: created, error } = await supabase
+    .from("packrite_catalogs")
+    .insert({ user_id: userId, name: "Unassigned", is_system: true })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return created.id;
+}

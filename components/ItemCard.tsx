@@ -10,10 +10,18 @@ export function ItemCard({
   item,
   onChange,
   onRemove,
+  onMove,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: {
   item: CatalogItem;
   onChange: (next: CatalogItem) => void;
   onRemove: (id: string) => void;
+  onMove: (id: string) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const url = useSignedUrl(item.image_path);
   const processing = item.status === "pending" || item.status === "processing";
@@ -53,7 +61,12 @@ export function ItemCard({
   }
 
   return (
-    <div className="animate-rise overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+    <div
+      className={cn(
+        "animate-rise relative overflow-hidden rounded-2xl border bg-surface shadow-sm",
+        selected ? "border-accent ring-2 ring-accent" : "border-border",
+      )}
+    >
       <div className="relative aspect-square bg-zinc-100">
         {url && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -65,38 +78,54 @@ export function ItemCard({
             <span className="text-xs font-medium text-accent">Cataloging…</span>
           </div>
         )}
-        {item.status === "done" && item.category && (
+        {item.status === "done" && item.category && !selectable && (
           <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium capitalize text-white backdrop-blur">
             {item.category}
           </span>
         )}
 
         {/* Overflow menu */}
-        <button
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-label="Item actions"
-          className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" className="size-4" aria-hidden>
-            <circle cx="12" cy="5" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="12" cy="19" r="1.6" />
-          </svg>
-        </button>
-        {menuOpen && (
+        {!selectable && (
           <>
-            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-1.5 top-10 z-20 w-32 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-xl">
-              <button
-                onClick={remove}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden>
-                  <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Delete
-              </button>
-            </div>
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label="Item actions"
+              className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="size-4" aria-hidden>
+                <circle cx="12" cy="5" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="12" cy="19" r="1.6" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-1.5 top-10 z-20 w-36 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-xl">
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onMove(item.id);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-foreground hover:bg-zinc-100"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden>
+                      <path d="M3 7a2 2 0 0 1 2-2h3.6l1.7 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                    </svg>
+                    Move to…
+                  </button>
+                  <button
+                    onClick={remove}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden>
+                      <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
@@ -148,6 +177,27 @@ export function ItemCard({
           </div>
         )}
       </div>
+
+      {selectable && (
+        <button
+          onClick={() => onToggleSelect?.(item.id)}
+          aria-label={selected ? "Deselect item" : "Select item"}
+          className="absolute inset-0 z-30"
+        >
+          <span
+            className={cn(
+              "absolute left-2 top-2 flex size-6 items-center justify-center rounded-full border-2 transition-colors",
+              selected
+                ? "border-accent bg-accent text-white"
+                : "border-white bg-black/25 text-transparent",
+            )}
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="size-3.5" aria-hidden>
+              <path d="m5 12 5 5 9-11" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </button>
+      )}
     </div>
   );
 }

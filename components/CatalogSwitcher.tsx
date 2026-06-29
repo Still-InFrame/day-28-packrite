@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getOrCreateUnassignedId } from "@/lib/catalogs";
 import { cn } from "@/lib/cn";
 import type { Catalog } from "@/lib/types";
 
@@ -70,26 +71,19 @@ export function CatalogSwitcher({
   async function remove(id: string) {
     setBusy(true);
     const supabase = createClient();
-    // Collect storage paths first — the row cascade won't touch the bucket.
-    const { data: items } = await supabase
+    // Items aren't deleted — they fall into the "Unassigned" bucket.
+    const unassignedId = await getOrCreateUnassignedId(supabase, userId);
+    await supabase
       .from("packrite_catalog_items")
-      .select("image_path")
+      .update({ catalog_id: unassignedId })
       .eq("catalog_id", id);
-    const paths = (items ?? [])
-      .map((i) => i.image_path as string | null)
-      .filter((p): p is string => Boolean(p));
-
-    // Deleting the catalog cascades its item rows (FK on delete cascade).
     await supabase.from("packrite_catalogs").delete().eq("id", id);
-    if (paths.length) {
-      await supabase.storage.from("item-photos").remove(paths);
-    }
 
     setBusy(false);
     setConfirmingId(null);
     if (id === activeId) {
       const next = catalogs.find((c) => c.id !== id);
-      if (next) onSelect(next.id);
+      onSelect(next ? next.id : unassignedId);
     }
     router.refresh();
   }
@@ -143,7 +137,7 @@ export function CatalogSwitcher({
                   return (
                     <div key={c.id} className="flex items-center gap-1 p-1">
                       <span className="min-w-0 flex-1 px-1.5 text-xs leading-tight text-muted">
-                        Delete and all its items?
+                        Delete? Items move to Unassigned.
                       </span>
                       <button
                         onClick={() => remove(c.id)}
@@ -181,24 +175,26 @@ export function CatalogSwitcher({
                         <CheckIcon className="size-4 shrink-0" />
                       )}
                     </button>
-                    <button
-                      onClick={() => {
-                        setRenamingId(c.id);
-                        setRenameValue(c.name);
-                      }}
-                      aria-label={`Rename ${c.name}`}
-                      className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-foreground"
-                    >
-                      <PencilIcon className="size-4" />
-                    </button>
-                    {catalogs.length > 1 && (
-                      <button
-                        onClick={() => setConfirmingId(c.id)}
-                        aria-label={`Delete ${c.name}`}
-                        className="mr-1 shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-red-100 hover:text-red-600"
-                      >
-                        <TrashIcon className="size-4" />
-                      </button>
+                    {!c.is_system && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setRenamingId(c.id);
+                            setRenameValue(c.name);
+                          }}
+                          aria-label={`Rename ${c.name}`}
+                          className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-200 hover:text-foreground"
+                        >
+                          <PencilIcon className="size-4" />
+                        </button>
+                        <button
+                          onClick={() => setConfirmingId(c.id)}
+                          aria-label={`Delete ${c.name}`}
+                          className="mr-1 shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-red-100 hover:text-red-600"
+                        >
+                          <TrashIcon className="size-4" />
+                        </button>
+                      </>
                     )}
                   </div>
                 );

@@ -25,6 +25,7 @@ create table if not exists public.packrite_catalogs (
   name       text not null default 'My Inventory',
   share_id   uuid not null default gen_random_uuid(),
   is_shared  boolean not null default false,
+  is_system  boolean not null default false, -- the "Unassigned" bucket
   created_at timestamptz not null default now()
 );
 create unique index if not exists packrite_catalogs_share_id_key on public.packrite_catalogs (share_id);

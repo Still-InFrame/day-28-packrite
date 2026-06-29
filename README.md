@@ -12,8 +12,9 @@ Day 28 of Savion's 100 Day AI Build Challenge.
 - **Hands-free auto-capture.** Flip on Auto and just hold each item up — a motion-settle detector snaps it the moment you hold it still, saves automatically, and offers a 3-second Undo. No ML model, works for any item including clothing.
 - **AI cataloging with your own key.** Each captured photo is sent to Claude (server-side), which returns a description, brand, primary color + hex swatch, and category. Cards fill themselves in live.
 - **Bring-your-own Anthropic key, encrypted.** You paste your key once on the Settings page. It's encrypted server-side with AES-256-GCM and never sent back to the browser — the UI only shows a masked preview.
-- **Multiple catalogs.** Organize captures into separate catalogs (e.g. "Carry-on", "Garage", "For sale") and switch the active one before you snap.
-- **Live inventory with filters.** A realtime grid you can search and filter by category and status. Brand and description are editable inline.
+- **Multiple catalogs.** Organize captures into separate buckets (e.g. "Carry-on", "Garage", "For sale"), switch the active one before you snap, and rename or delete buckets. Deleting a bucket never loses items — they fall into an "Unassigned" bucket.
+- **Move & bulk actions.** Move any item to another bucket, or multi-select to move or delete many at once.
+- **Live inventory with filters.** A realtime grid you can search and filter by category and status. Brand and description are editable inline; delete an item from its card menu.
 - **Shareable, read-only links.** Flip a catalog to public and share an unguessable link — viewers see a clean read-only gallery, no sign-in. Rotate the link any time to revoke access.
 - **Durable background pipeline.** Cataloging is driven by a Supabase Database Webhook (browser-independent), a best-effort client trigger, and a reconciler that re-queues anything that slipped through — so a closed tab never leaves an item stuck.
 

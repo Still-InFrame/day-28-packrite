@@ -22,6 +22,7 @@ export interface Catalog {
   name: string;
   share_id: string;
   is_shared: boolean;
+  is_system: boolean; // the "Unassigned" bucket — not renamable/deletable
   created_at: string;
 }
 
