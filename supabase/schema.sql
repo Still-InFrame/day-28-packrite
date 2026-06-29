@@ -195,20 +195,26 @@ begin
     'users', (
       select coalesce(jsonb_agg(u order by u.created_at desc), '[]'::jsonb)
       from (
-        select au.id, au.email, au.created_at, au.last_sign_in_at,
+        select au.id, au.email,
+          -- packrite join date (earliest activity here), NOT the shared auth date
+          coalesce(least(cc.first_catalog_at, ic.first_item_at), k.updated_at, au.created_at) as created_at,
+          au.last_sign_in_at,
           (au.banned_until is not null and au.banned_until > now()) as banned,
           coalesce(ic.cnt, 0) as items, (k.user_id is not null) as has_key,
           ic.last_item_at
         from auth.users au
         left join (
-          select user_id, count(*) cnt, max(created_at) last_item_at
+          select user_id, count(*) cnt, max(created_at) last_item_at,
+                 min(created_at) first_item_at
           from public.packrite_catalog_items group by user_id
         ) ic on ic.user_id = au.id
+        left join (
+          select user_id, min(created_at) first_catalog_at
+          from public.packrite_catalogs group by user_id
+        ) cc on cc.user_id = au.id
         left join public.packrite_user_api_keys k on k.user_id = au.id
-        -- shared sandbox: only count users who've actually used packrite
-        where exists (select 1 from public.packrite_catalogs c where c.user_id = au.id)
-           or ic.cnt is not null
-           or k.user_id is not null
+        -- shared sandbox: only users who've actually used packrite
+        where cc.user_id is not null or ic.cnt is not null or k.user_id is not null
       ) u
     ),
     'items', (
