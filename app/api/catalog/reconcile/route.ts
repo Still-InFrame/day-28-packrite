@@ -41,7 +41,7 @@ export async function POST() {
   }
 
   for (const row of stuck) {
-    await processItem(row.id);
+    await processItem(row.id, supabase);
   }
 
   return NextResponse.json({ processed: stuck.length });

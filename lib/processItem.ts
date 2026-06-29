@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { decrypt } from "@/lib/crypto";
 import type { CatalogVision } from "@/lib/types";
 
@@ -19,13 +19,17 @@ Return ONLY raw JSON — no markdown, no backticks, no preamble — in exactly t
 type Result = { status: "done" | "error" | "skipped" | "no_key" };
 
 // Idempotent worker shared by the webhook, the client kick, and the reconciler.
-// Uses the service-role client so it works with or without a user session, and
-// atomically claims the row so the same item is never processed twice.
-export async function processItem(itemId: string): Promise<Result> {
-  const admin = createAdminClient();
-
+// The caller passes the Supabase client to use: a user-session client (client
+// kick / reconciler — works through RLS, no service-role key needed) or the
+// service-role admin client (the webhook, which has no user session). The
+// atomic pending -> processing claim guarantees the same item is never processed
+// twice regardless of which trigger fires.
+export async function processItem(
+  itemId: string,
+  supabase: SupabaseClient,
+): Promise<Result> {
   // Atomic claim: only one caller can flip pending -> processing.
-  const { data: item } = await admin
+  const { data: item } = await supabase
     .from("packrite_catalog_items")
     .update({ status: "processing" })
     .eq("id", itemId)
@@ -38,14 +42,14 @@ export async function processItem(itemId: string): Promise<Result> {
   try {
     // The user's encrypted key. If absent, return the item to pending so it
     // gets cataloged automatically once they add a key (reconciler picks it up).
-    const { data: keyRow } = await admin
+    const { data: keyRow } = await supabase
       .from("packrite_user_api_keys")
       .select("ciphertext, iv, auth_tag")
       .eq("user_id", item.user_id)
       .maybeSingle();
 
     if (!keyRow) {
-      await admin
+      await supabase
         .from("packrite_catalog_items")
         .update({ status: "pending" })
         .eq("id", item.id);
@@ -54,7 +58,7 @@ export async function processItem(itemId: string): Promise<Result> {
 
     if (!item.image_path) throw new Error("item has no image");
 
-    const { data: file, error: dlErr } = await admin.storage
+    const { data: file, error: dlErr } = await supabase.storage
       .from("item-photos")
       .download(item.image_path);
     if (dlErr || !file) throw dlErr ?? new Error("image download failed");
@@ -97,7 +101,7 @@ export async function processItem(itemId: string): Promise<Result> {
 
     const vision = parseVision(text);
 
-    await admin
+    await supabase
       .from("packrite_catalog_items")
       .update({
         status: "done",
@@ -112,7 +116,7 @@ export async function processItem(itemId: string): Promise<Result> {
     return { status: "done" };
   } catch (err) {
     console.error("packrite: processItem failed", itemId, err);
-    await admin
+    await supabase
       .from("packrite_catalog_items")
       .update({ status: "error" })
       .eq("id", item.id);
