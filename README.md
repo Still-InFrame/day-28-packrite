@@ -1,5 +1,7 @@
 # packrite
 
+**Live:** https://packrite.100dayaichallenge.com
+
 **Snap, catalog, pack.** A mobile-first web app for cataloging items while you pack. Point your phone at an item, tap the shutter, approve the photo, and keep going — packrite identifies and describes everything in the background with Claude, so you never wait on the AI.
 
 Day 28 of Savion's 100 Day AI Build Challenge.
