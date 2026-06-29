@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Wordmark } from "@/components/Brand";
 import { AuthForm } from "@/components/AuthForm";
 
 export default function LoginPage() {
@@ -13,8 +12,12 @@ export default function LoginPage() {
 
       <div className="relative w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <Wordmark className="mb-5" />
-          <h1 className="text-2xl font-semibold tracking-tight">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/logo.png" alt="packrite" className="mb-3 size-20" />
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
+            packrite
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight">
             Snap it. Pack it.
           </h1>
           <p className="mt-2 text-sm leading-6 text-muted">
