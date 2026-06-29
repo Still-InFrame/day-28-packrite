@@ -154,16 +154,12 @@ function SetupNeeded() {
   return (
     <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
       <h2 className="text-base font-semibold text-amber-900">
-        One setup step
+        Couldn&apos;t load telemetry
       </h2>
       <p className="mt-1 text-sm leading-6 text-amber-800">
-        Telemetry reads user accounts and admin data, which needs the Supabase{" "}
-        <span className="font-medium">service-role key</span>. Set{" "}
-        <code className="rounded bg-amber-100 px-1 py-0.5 text-xs">
-          SUPABASE_SERVICE_ROLE_KEY
-        </code>{" "}
-        in your environment (Supabase → Settings → API → service_role), then
-        reload. The same key also enables share links and the webhook.
+        The admin data function didn&apos;t return. Make sure your account is in
+        the <code className="rounded bg-amber-100 px-1 py-0.5 text-xs">packrite_admins</code>{" "}
+        allowlist, then reload.
       </p>
     </div>
   );

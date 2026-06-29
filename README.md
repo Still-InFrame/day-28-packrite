@@ -57,14 +57,17 @@ Copy `.env.local.example` to `.env.local` and fill in:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...   # Settings → API → Publishable key
-SUPABASE_SERVICE_ROLE_KEY=...              # Settings → API → service_role (secret)
 APP_ENCRYPTION_KEY=...                      # 32 random bytes, base64:  openssl rand -base64 32
 CATALOG_WEBHOOK_SECRET=...                  # any random string:        openssl rand -hex 24
+ADMIN_EMAIL=you@example.com                 # for the /admin telemetry dashboard
+SUPABASE_SERVICE_ROLE_KEY=                  # OPTIONAL — only the prod webhook uses it
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is only needed for the background webhook and public share links;
-core capture/catalog works without it locally. The other three server-only values never reach
-the browser.
+Capture, cataloging, sharing, and the admin dashboard all work **without** the service-role key —
+sharing and admin telemetry run through `SECURITY DEFINER` functions, not a god-mode key. The
+service-role key is only needed if you wire up the production DB webhook. For the admin dashboard,
+also add your email to the `packrite_admins` table (see `supabase/schema.sql`). Server-only values
+never reach the browser.
 
 ### 3. Background cataloging webhook (production)
 

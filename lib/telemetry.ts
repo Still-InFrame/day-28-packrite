@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 export interface Series {
   labels: string[];
@@ -29,88 +29,76 @@ export interface Telemetry {
   active: { d7: number; d30: number };
   catalogSeconds: { avg: number | null; median: number | null; p90: number | null };
   signups: { day: Series; week: Series; month: Series };
-  scansByHour: number[]; // 24 buckets, by capture time
-  scansByDay: Series; // last 30 days, captures/day
+  scansByHour: number[];
+  scansByDay: Series;
   users: AdminUserRow[];
+}
+
+// Shape returned by the packrite_admin_overview() SECURITY DEFINER function.
+interface OverviewRow {
+  catalogs: number;
+  users: Array<{
+    id: string;
+    email: string | null;
+    created_at: string;
+    last_sign_in_at: string | null;
+    banned: boolean;
+    items: number;
+    has_key: boolean;
+    last_item_at: string | null;
+  }>;
+  items: Array<{
+    status: string;
+    created_at: string;
+    cataloged_at: string | null;
+  }>;
 }
 
 const DAY = 86_400_000;
 
+// No service-role key: the admin-gated SECURITY DEFINER RPC reads auth.users for
+// us and returns the raw data; we aggregate the time-series here.
 export async function getTelemetry(): Promise<Telemetry> {
-  const admin = createAdminClient();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("packrite_admin_overview");
+  if (error || !data) throw error ?? new Error("no telemetry");
+
+  const o = data as OverviewRow;
   const now = new Date();
+  const users = o.users ?? [];
+  const items = o.items ?? [];
 
-  // --- Auth users (paginated) ---------------------------------------------
-  type AuthUser = {
-    id: string;
-    email?: string;
-    created_at: string;
-    last_sign_in_at?: string | null;
-    banned_until?: string | null;
-  };
-  const authUsers: AuthUser[] = [];
-  for (let page = 1; page < 50; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({
-      page,
-      perPage: 1000,
-    });
-    if (error) throw error;
-    authUsers.push(...(data.users as unknown as AuthUser[]));
-    if (data.users.length < 1000) break;
-  }
-
-  // --- App data (service role bypasses RLS) -------------------------------
-  const { data: itemRows } = await admin
-    .from("packrite_catalog_items")
-    .select("user_id, status, created_at, cataloged_at");
-  const items = itemRows ?? [];
-
-  const { data: keyRows } = await admin
-    .from("packrite_user_api_keys")
-    .select("user_id");
-  const keyedUsers = new Set((keyRows ?? []).map((k) => k.user_id));
-
-  const { count: catalogCount } = await admin
-    .from("packrite_catalogs")
-    .select("id", { count: "exact", head: true });
-
-  // --- Totals --------------------------------------------------------------
   const totals = {
-    users: authUsers.length,
+    users: users.length,
     items: items.length,
     done: items.filter((i) => i.status === "done").length,
     processing: items.filter((i) => i.status === "processing").length,
     pending: items.filter((i) => i.status === "pending").length,
     error: items.filter((i) => i.status === "error").length,
-    usersWithKey: keyedUsers.size,
-    catalogs: catalogCount ?? 0,
+    usersWithKey: users.filter((u) => u.has_key).length,
+    catalogs: o.catalogs ?? 0,
   };
 
-  // --- Items per user + activity ------------------------------------------
-  const itemsByUser = new Map<string, number>();
-  const activeBy7 = new Set<string>();
-  const activeBy30 = new Set<string>();
-  for (const i of items) {
-    itemsByUser.set(i.user_id, (itemsByUser.get(i.user_id) ?? 0) + 1);
-    const age = now.getTime() - new Date(i.created_at).getTime();
-    if (age <= 7 * DAY) activeBy7.add(i.user_id);
-    if (age <= 30 * DAY) activeBy30.add(i.user_id);
-  }
-  for (const u of authUsers) {
-    if (!u.last_sign_in_at) continue;
-    const age = now.getTime() - new Date(u.last_sign_in_at).getTime();
-    if (age <= 7 * DAY) activeBy7.add(u.id);
-    if (age <= 30 * DAY) activeBy30.add(u.id);
+  let d7 = 0;
+  let d30 = 0;
+  for (const u of users) {
+    const last = Math.max(
+      u.last_item_at ? new Date(u.last_item_at).getTime() : 0,
+      u.last_sign_in_at ? new Date(u.last_sign_in_at).getTime() : 0,
+    );
+    if (!last) continue;
+    const age = now.getTime() - last;
+    if (age <= 7 * DAY) d7 += 1;
+    if (age <= 30 * DAY) d30 += 1;
   }
 
-  // --- Cataloging time -----------------------------------------------------
   const durations: number[] = [];
   for (const i of items) {
     if (i.status === "done" && i.cataloged_at) {
       const s =
         (new Date(i.cataloged_at).getTime() - new Date(i.created_at).getTime()) /
         1000;
-      if (s >= 0 && s < 3600) durations.push(s); // ignore outliers > 1h
+      if (s >= 0 && s < 3600) durations.push(s);
     }
   }
   durations.sort((a, b) => a - b);
@@ -124,16 +112,14 @@ export async function getTelemetry(): Promise<Telemetry> {
       : null,
   };
 
-  // --- Time series ---------------------------------------------------------
-  const signupDates = authUsers.map((u) => new Date(u.created_at));
+  const signupDates = users.map((u) => new Date(u.created_at));
   const captureDates = items.map((i) => new Date(i.created_at));
-
   const scansByHour = new Array(24).fill(0) as number[];
   for (const d of captureDates) scansByHour[d.getHours()] += 1;
 
   return {
     totals,
-    active: { d7: activeBy7.size, d30: activeBy30.size },
+    active: { d7, d30 },
     catalogSeconds,
     signups: {
       day: bucketDaily(signupDates, now, 30),
@@ -142,17 +128,15 @@ export async function getTelemetry(): Promise<Telemetry> {
     },
     scansByHour,
     scansByDay: bucketDaily(captureDates, now, 30),
-    users: authUsers
+    users: users
       .map((u) => ({
         id: u.id,
         email: u.email ?? "—",
         createdAt: u.created_at,
-        lastSignInAt: u.last_sign_in_at ?? null,
-        banned: Boolean(
-          u.banned_until && new Date(u.banned_until).getTime() > now.getTime(),
-        ),
-        items: itemsByUser.get(u.id) ?? 0,
-        hasKey: keyedUsers.has(u.id),
+        lastSignInAt: u.last_sign_in_at,
+        banned: u.banned,
+        items: u.items,
+        hasKey: u.has_key,
       }))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
   };
@@ -172,8 +156,7 @@ function bucketDaily(dates: Date[], now: Date, days: number): Series {
     data.push(0);
   }
   for (const d of dates) {
-    const key = d.toISOString().slice(0, 10);
-    const idx = index.get(key);
+    const idx = index.get(d.toISOString().slice(0, 10));
     if (idx !== undefined) data[idx] += 1;
   }
   return { labels, data };
@@ -184,8 +167,7 @@ function bucketWeekly(dates: Date[], now: Date, weeks: number): Series {
   const data: number[] = [];
   const starts: number[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
-    const end = now.getTime() - i * 7 * DAY;
-    const start = end - 7 * DAY;
+    const start = now.getTime() - i * 7 * DAY - 7 * DAY;
     starts.push(start);
     const d = new Date(start);
     labels.push(`${d.getMonth() + 1}/${d.getDate()}`);
@@ -194,9 +176,7 @@ function bucketWeekly(dates: Date[], now: Date, weeks: number): Series {
   for (const d of dates) {
     const t = d.getTime();
     for (let w = 0; w < starts.length; w++) {
-      const lo = starts[w];
-      const hi = lo + 7 * DAY;
-      if (t > lo && t <= hi) {
+      if (t > starts[w] && t <= starts[w] + 7 * DAY) {
         data[w] += 1;
         break;
       }
@@ -212,14 +192,12 @@ function bucketMonthly(dates: Date[], now: Date, months: number): Series {
   const fmt = new Intl.DateTimeFormat("en", { month: "short" });
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    index.set(key, labels.length);
+    index.set(`${d.getFullYear()}-${d.getMonth()}`, labels.length);
     labels.push(fmt.format(d));
     data.push(0);
   }
   for (const d of dates) {
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    const idx = index.get(key);
+    const idx = index.get(`${d.getFullYear()}-${d.getMonth()}`);
     if (idx !== undefined) data[idx] += 1;
   }
   return { labels, data };

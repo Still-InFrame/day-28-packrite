@@ -167,6 +167,84 @@ $$;
 grant execute on function public.packrite_shared_catalog(uuid) to anon, authenticated;
 grant execute on function public.packrite_shared_items(uuid) to anon, authenticated;
 
+-- ===========================================================================
+-- Admin telemetry — NO service-role key. SECURITY DEFINER functions run as the
+-- owner (can read auth.users + write bans) and enforce admin-only access via the
+-- packrite_admins allowlist. Called with the normal logged-in client.
+-- Seed your admin email into packrite_admins below.
+-- ===========================================================================
+create table if not exists public.packrite_admins (email text primary key);
+alter table public.packrite_admins enable row level security; -- no policies: API can't read it
+-- insert into public.packrite_admins (email) values ('you@example.com') on conflict do nothing;
+
+create or replace function public.packrite_is_admin()
+returns boolean language sql security definer set search_path = public as $$
+  select exists (
+    select 1 from public.packrite_admins a
+    where a.email = (select email from auth.users where id = auth.uid())
+  );
+$$;
+
+create or replace function public.packrite_admin_overview()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare result jsonb;
+begin
+  if not public.packrite_is_admin() then raise exception 'forbidden'; end if;
+  select jsonb_build_object(
+    'catalogs', (select count(*) from public.packrite_catalogs),
+    'users', (
+      select coalesce(jsonb_agg(u order by u.created_at desc), '[]'::jsonb)
+      from (
+        select au.id, au.email, au.created_at, au.last_sign_in_at,
+          (au.banned_until is not null and au.banned_until > now()) as banned,
+          coalesce(ic.cnt, 0) as items, (k.user_id is not null) as has_key,
+          ic.last_item_at
+        from auth.users au
+        left join (
+          select user_id, count(*) cnt, max(created_at) last_item_at
+          from public.packrite_catalog_items group by user_id
+        ) ic on ic.user_id = au.id
+        left join public.packrite_user_api_keys k on k.user_id = au.id
+      ) u
+    ),
+    'items', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'status', i.status, 'created_at', i.created_at, 'cataloged_at', i.cataloged_at
+      )), '[]'::jsonb)
+      from public.packrite_catalog_items i
+    )
+  ) into result;
+  return result;
+end;
+$$;
+
+create or replace function public.packrite_admin_set_blocked(p_target uuid, p_blocked boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.packrite_is_admin() then raise exception 'forbidden'; end if;
+  if p_target = auth.uid() then raise exception 'cannot modify self'; end if;
+  update auth.users set banned_until =
+    case when p_blocked then now() + interval '100 years' else null end
+    where id = p_target;
+end;
+$$;
+
+create or replace function public.packrite_admin_delete_user(p_target uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.packrite_is_admin() then raise exception 'forbidden'; end if;
+  if p_target = auth.uid() then raise exception 'cannot delete self'; end if;
+  delete from storage.objects where bucket_id = 'item-photos'
+    and (storage.foldername(name))[1] = p_target::text;
+  delete from auth.users where id = p_target;
+end;
+$$;
+
+grant execute on function public.packrite_is_admin() to authenticated;
+grant execute on function public.packrite_admin_overview() to authenticated;
+grant execute on function public.packrite_admin_set_blocked(uuid, boolean) to authenticated;
+grant execute on function public.packrite_admin_delete_user(uuid) to authenticated;
+
 -- Anyone may read (and sign a URL for) a photo that belongs to a shared item.
 create policy "packrite_item_photos_shared_read" on storage.objects
   for select using (
